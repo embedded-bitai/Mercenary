@@ -97,6 +97,7 @@ DEBUG_TYPE = gdb
 
 #Optimize Level
 OPT = 2 
+#OPT = 0
 
 # Place -D or -U options here
 ifeq ($(BUILD_TARGET_ARCH),x86)

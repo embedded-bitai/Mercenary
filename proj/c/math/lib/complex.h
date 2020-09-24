@@ -35,3 +35,4 @@ float magnitude(comp z);
 void conjugate(comp *z);
 
 void complex2phasor(comp z, phasor *res);
+void phasor2complex(phasor p, comp *res);

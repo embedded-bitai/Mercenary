@@ -49,5 +49,8 @@ int main(void)
 	deg = radian2degree(p2.phase);
 	printf("phase = %.4f, deg = %.4f\n", p2.phase, deg);
 
+	phasor2complex(p1, &z1);
+	complex_print(z1);
+
 	return 0;
 }

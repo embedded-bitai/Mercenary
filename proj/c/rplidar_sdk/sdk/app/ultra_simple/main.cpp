@@ -145,6 +145,7 @@ int main(int argc, const char * argv[]) {
         size_t baudRateArraySize = (sizeof(baudrateArray))/ (sizeof(baudrateArray[0]));
         for(size_t i = 0; i < baudRateArraySize; ++i)
         {
+			// raw_serial
             if(!drv)
                 drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
             if(IS_OK(drv->connect(opt_com_path, baudrateArray[i])))

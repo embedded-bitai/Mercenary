@@ -68,3 +68,9 @@ void phasor_print(phasor p)
 {
 	printf("Amplitude: %.4f, Phase: %.4f\n", p.amp, p.phase);
 }
+
+void phasor2complex(phasor p, comp *res)
+{
+	res->real = p.amp * cos(p.phase);
+	res->imag = p.amp * sin(p.phase);
+}
