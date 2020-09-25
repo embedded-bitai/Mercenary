@@ -2,5 +2,17 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/../.." vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/gin-contrib/sse" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/gin-gonic/gin" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/go-playground/locales" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/go-playground/universal-translator" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/go-playground/validator" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/golang/protobuf" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/leodido/go-urn" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/mattn/go-isatty" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/ugorji/go" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/golang.org/x/sys" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/google.golang.org/protobuf" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/gopkg.in/yaml.v2" vcs="Git" />
   </component>
 </project>
