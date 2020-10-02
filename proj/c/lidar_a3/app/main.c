@@ -192,8 +192,8 @@ typedef struct _rplidar_payload_acc_board_flag_t {
 } __attribute__((packed)) rplidar_payload_acc_board_flag_t;
 
 typedef struct _rplidar_response_device_health_t {
-    _u8   status;
-    _u16  error_code;
+    u8   status;
+    u16  error_code;
 } __attribute__((packed)) rplidar_response_device_health_t;
 
 void clear_dtr(void);
