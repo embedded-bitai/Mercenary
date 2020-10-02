@@ -1,15 +1,27 @@
+#include <stdio.h>
 #include "custom_vector.h"
 
 int main(void)
 {
-	int custom_vector_num;
-	custom_vector answer;
+    VECTOR_OF(int) int_vec;
+    VECTOR_OF(double) dbl_vec;
+    int i, cnt = 1;
 
-	// TODO: Use #define to make it polymorphism
-	// init_custom_vector(&answer, "u8"), init_custom_vector(&answer, "u16"), etc ...
-	init_custom_vector(&answer);
-	custom_vector_num = custom_vector_size(answer);
-	printf("custom_vector_num = %d\n", custom_vector_num);
+    VECTOR_INIT(int_vec);
+    VECTOR_INIT(dbl_vec);
 
-	return 0;
+    for (i = 0; i < 100; ++i) {
+        VECTOR_PUSH_BACK(int_vec, cnt);
+        VECTOR_PUSH_BACK(dbl_vec, cnt++);
+    }
+
+    for (i = 0; i < 100; ++i) {
+        printf("int_vec[%d] = %d\n", i, VECTOR_AT(int_vec, i));
+        printf("dbl_vec[%d] = %f\n", i, VECTOR_AT(dbl_vec, i));
+    }
+
+    VECTOR_FREE(int_vec);
+    VECTOR_FREE(dbl_vec);
+
+    return 0;
 }

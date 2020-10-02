@@ -17,13 +17,13 @@ all: $(TARGET)
 
 $(TARGET): $(OBJS)
 custom_vector_test: custom_vector_test.o
-	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS)
+	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
 
 .c.o:
 	@echo "**********************************"
 	@echo "********** Main Program **********"
 	@echo "**********************************"
-	$(CC) -c $< -o $@ $(INC_DIRS)
+	$(CC) -c $< -o $@ $(INC_DIRS) -g
 
 clean:
 	rm -rf *.o
