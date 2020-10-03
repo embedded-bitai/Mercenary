@@ -4,7 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define VECTOR_OF(T) struct { \
+#define MAKE_VECTOR_TYPE(T) \
+typedef struct _vector_##T vector_##T;
+
+#define VECTOR_OF(T)    \
+struct _vector_##T { \
     typeof (T) *data; \
     unsigned size; \
     unsigned capacity; \

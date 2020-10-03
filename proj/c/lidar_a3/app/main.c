@@ -14,6 +14,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 
+#include "custom_vector.h"
+
 #define EVENT_TIMEOUT	(-1)
 #define EVENT_OK		(1)
 
@@ -47,6 +49,183 @@ typedef uint32_t		u_result;
 	__typeof__ (b) _b = (b); \
 	_a > _b ? _a : _b; \
 })
+
+#if 0
+#   define RPLIDAR_CONF_SCAN_COMMAND_STD            0
+#   define RPLIDAR_CONF_SCAN_COMMAND_EXPRESS        1
+#   define RPLIDAR_CONF_SCAN_COMMAND_HQ             2
+#   define RPLIDAR_CONF_SCAN_COMMAND_BOOST          3
+#   define RPLIDAR_CONF_SCAN_COMMAND_STABILITY      4
+#   define RPLIDAR_CONF_SCAN_COMMAND_SENSITIVITY    5
+
+#define RPLIDAR_CONF_ANGLE_RANGE                    0x00000000
+#define RPLIDAR_CONF_DESIRED_ROT_FREQ               0x00000001
+#define RPLIDAR_CONF_SCAN_COMMAND_BITMAP            0x00000002
+#define RPLIDAR_CONF_MIN_ROT_FREQ                   0x00000004
+#define RPLIDAR_CONF_MAX_ROT_FREQ                   0x00000005
+#define RPLIDAR_CONF_MAX_DISTANCE                   0x00000060
+
+#define RPLIDAR_CONF_SCAN_MODE_COUNT                0x00000070
+#define RPLIDAR_CONF_SCAN_MODE_US_PER_SAMPLE        0x00000071
+#define RPLIDAR_CONF_SCAN_MODE_MAX_DISTANCE         0x00000074
+#define RPLIDAR_CONF_SCAN_MODE_ANS_TYPE             0x00000075
+#define RPLIDAR_CONF_SCAN_MODE_TYPICAL              0x0000007C
+#define RPLIDAR_CONF_SCAN_MODE_NAME                 0x0000007F
+#define RPLIDAR_EXPRESS_SCAN_STABILITY_BITMAP                 4
+#define RPLIDAR_EXPRESS_SCAN_SENSITIVITY_BITMAP               5
+#endif
+
+#define RPLIDAR_STATUS_OK                 0x0
+#define RPLIDAR_STATUS_WARNING            0x1
+#define RPLIDAR_STATUS_ERROR              0x2
+
+#define RPLIDAR_RESP_MEASUREMENT_SYNCBIT        (0x1<<0)
+#define RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT  2
+
+#define RPLIDAR_RESP_HQ_FLAG_SYNCBIT               (0x1<<0)
+
+#define RPLIDAR_RESP_MEASUREMENT_CHECKBIT       (0x1<<0)
+#define RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT    1
+
+typedef struct _rplidar_response_sample_rate_t {
+    u16  std_sample_duration_us;
+    u16  express_sample_duration_us;
+} __attribute__((packed)) rplidar_response_sample_rate_t;
+
+typedef struct _rplidar_response_measurement_node_t {
+    u8    sync_quality;      // syncbit:1;syncbit_inverse:1;quality:6;
+    u16   angle_q6_checkbit; // check_bit:1;angle_q6:15;
+    u16   distance_q2;
+} __attribute__((packed)) rplidar_response_measurement_node_t;
+
+//[distance_sync flags]
+#define RPLIDAR_RESP_MEASUREMENT_EXP_ANGLE_MASK           (0x3)
+#define RPLIDAR_RESP_MEASUREMENT_EXP_DISTANCE_MASK        (0xFC)
+
+typedef struct _rplidar_response_cabin_nodes_t {
+    u16   distance_angle_1; // see [distance_sync flags]
+    u16   distance_angle_2; // see [distance_sync flags]
+    u8    offset_angles_q3;  
+} __attribute__((packed)) rplidar_response_cabin_nodes_t;
+
+#define RPLIDAR_RESP_MEASUREMENT_EXP_SYNC_1               0xA
+#define RPLIDAR_RESP_MEASUREMENT_EXP_SYNC_2               0x5
+
+#define RPLIDAR_RESP_MEASUREMENT_HQ_SYNC                  0xA5
+
+#define RPLIDAR_RESP_MEASUREMENT_EXP_SYNCBIT              (0x1<<15)
+
+typedef struct _rplidar_response_capsule_measurement_nodes_t {
+    u8                             s_checksum_1; // see [s_checksum_1]
+    u8                             s_checksum_2; // see [s_checksum_1]
+    u16                            start_angle_sync_q6;
+    rplidar_response_cabin_nodes_t  cabins[16];
+} __attribute__((packed)) rplidar_response_capsule_measurement_nodes_t;
+
+typedef struct _rplidar_response_dense_cabin_nodes_t {
+    u16   distance;
+} __attribute__((packed)) rplidar_response_dense_cabin_nodes_t;
+
+typedef struct _rplidar_response_dense_capsule_measurement_nodes_t {
+    u8                             s_checksum_1; // see [s_checksum_1]
+    u8                             s_checksum_2; // see [s_checksum_1]
+    u16                            start_angle_sync_q6;
+    rplidar_response_dense_cabin_nodes_t  cabins[40];
+} __attribute__((packed)) rplidar_response_dense_capsule_measurement_nodes_t;
+
+// ext1 : x2 boost mode
+
+#define RPLIDAR_RESP_MEASUREMENT_EXP_ULTRA_MAJOR_BITS     12
+#define RPLIDAR_RESP_MEASUREMENT_EXP_ULTRA_PREDICT_BITS   10
+
+typedef struct _rplidar_response_ultra_cabin_nodes_t {
+    // 31                                              0
+    // | predict2 10bit | predict1 10bit | major 12bit |
+    u32 combined_x3;
+} __attribute__((packed)) rplidar_response_ultra_cabin_nodes_t;
+
+typedef struct _rplidar_response_ultra_capsule_measurement_nodes_t {
+    u8                             s_checksum_1; // see [s_checksum_1]
+    u8                             s_checksum_2; // see [s_checksum_1]
+    u16                            start_angle_sync_q6;
+    rplidar_response_ultra_cabin_nodes_t  ultra_cabins[32];
+} __attribute__((packed)) rplidar_response_ultra_capsule_measurement_nodes_t;
+
+typedef struct rplidar_response_measurement_node_hq_t {
+    u16   angle_z_q14;
+    u32   dist_mm_q2;
+    u8    quality;
+    u8    flag;
+} __attribute__((packed)) rplidar_response_measurement_node_hq_t;
+
+typedef struct _rplidar_response_hq_capsule_measurement_nodes_t{
+    u8 sync_byte;
+    u64 time_stamp;
+    rplidar_response_measurement_node_hq_t node_hq[16];
+    u32  crc32;
+}__attribute__((packed)) rplidar_response_hq_capsule_measurement_nodes_t;
+
+#   define RPLIDAR_CONF_SCAN_COMMAND_STD            0
+#   define RPLIDAR_CONF_SCAN_COMMAND_EXPRESS        1
+#   define RPLIDAR_CONF_SCAN_COMMAND_HQ             2
+#   define RPLIDAR_CONF_SCAN_COMMAND_BOOST          3
+#   define RPLIDAR_CONF_SCAN_COMMAND_STABILITY      4
+#   define RPLIDAR_CONF_SCAN_COMMAND_SENSITIVITY    5
+
+#define RPLIDAR_CONF_ANGLE_RANGE                    0x00000000
+#define RPLIDAR_CONF_DESIRED_ROT_FREQ               0x00000001
+#define RPLIDAR_CONF_SCAN_COMMAND_BITMAP            0x00000002
+#define RPLIDAR_CONF_MIN_ROT_FREQ                   0x00000004
+#define RPLIDAR_CONF_MAX_ROT_FREQ                   0x00000005
+#define RPLIDAR_CONF_MAX_DISTANCE                   0x00000060
+
+#define RPLIDAR_CONF_SCAN_MODE_COUNT                0x00000070
+#define RPLIDAR_CONF_SCAN_MODE_US_PER_SAMPLE        0x00000071
+#define RPLIDAR_CONF_SCAN_MODE_MAX_DISTANCE         0x00000074
+#define RPLIDAR_CONF_SCAN_MODE_ANS_TYPE             0x00000075
+#define RPLIDAR_CONF_SCAN_MODE_TYPICAL              0x0000007C
+#define RPLIDAR_CONF_SCAN_MODE_NAME                 0x0000007F
+#define RPLIDAR_EXPRESS_SCAN_STABILITY_BITMAP                 4
+#define RPLIDAR_EXPRESS_SCAN_SENSITIVITY_BITMAP               5
+
+typedef struct _rplidar_response_get_lidar_conf{
+    u32 type;
+    u8  payload[0];
+}__attribute__((packed)) rplidar_response_get_lidar_conf_t;
+
+typedef struct _rplidar_response_set_lidar_conf{
+    u32 result;
+}__attribute__((packed)) rplidar_response_set_lidar_conf_t;
+
+typedef struct _rplidar_response_device_info_t {
+    u8   model;
+    u16  firmware_version;
+    u8   hardware_version;
+    u8   serialnum[16];
+} __attribute__((packed)) rplidar_response_device_info_t;
+
+typedef struct _rplidar_response_device_health_t {
+    u8   status;
+    u16  error_code;
+} __attribute__((packed)) rplidar_response_device_health_t;
+
+// Definition of the variable bit scale encoding mechanism
+#define RPLIDAR_VARBITSCALE_X2_SRC_BIT  9
+#define RPLIDAR_VARBITSCALE_X4_SRC_BIT  11
+#define RPLIDAR_VARBITSCALE_X8_SRC_BIT  12
+#define RPLIDAR_VARBITSCALE_X16_SRC_BIT 14
+
+#define RPLIDAR_VARBITSCALE_X2_DEST_VAL 512
+#define RPLIDAR_VARBITSCALE_X4_DEST_VAL 1280
+#define RPLIDAR_VARBITSCALE_X8_DEST_VAL 1792
+#define RPLIDAR_VARBITSCALE_X16_DEST_VAL 3328
+
+#define RPLIDAR_VARBITSCALE_GET_SRC_MAX_VAL_BY_BITS(_BITS_) \
+    (  (((0x1<<(_BITS_)) - RPLIDAR_VARBITSCALE_X16_DEST_VAL)<<4) + \
+       ((RPLIDAR_VARBITSCALE_X16_DEST_VAL - RPLIDAR_VARBITSCALE_X8_DEST_VAL)<<3) + \
+       ((RPLIDAR_VARBITSCALE_X8_DEST_VAL - RPLIDAR_VARBITSCALE_X4_DEST_VAL)<<2) + \
+       ((RPLIDAR_VARBITSCALE_X4_DEST_VAL - RPLIDAR_VARBITSCALE_X2_DEST_VAL)<<1) + \
+       RPLIDAR_VARBITSCALE_X2_DEST_VAL - 1)
 
 // Response
 #define RPLIDAR_ANS_TYPE_DEVINFO          0x4
@@ -122,8 +301,41 @@ typedef struct _rplidar_response_acc_board_flag_t {
 #define RPLIDAR_CMD_SET_MOTOR_PWM      0xF0
 #define RPLIDAR_CMD_GET_ACC_BOARD_FLAG 0xFF
 
+// Payloads 
+#define RPLIDAR_EXPRESS_SCAN_MODE_NORMAL      0 
+#define RPLIDAR_EXPRESS_SCAN_MODE_FIXANGLE    0  // won't been supported but keep to prevent build fail
+
+//for express working flag(extending express scan protocol)
+#define RPLIDAR_EXPRESS_SCAN_FLAG_BOOST                 0x0001 
+#define RPLIDAR_EXPRESS_SCAN_FLAG_SUNLIGHT_REJECTION    0x0002
+
+//for ultra express working flag
+#define RPLIDAR_ULTRAEXPRESS_SCAN_FLAG_STD                 0x0001 
+#define RPLIDAR_ULTRAEXPRESS_SCAN_FLAG_HIGH_SENSITIVITY    0x0002
+
+#define RPLIDAR_HQ_SCAN_FLAG_CCW            (0x1<<0)
+#define RPLIDAR_HQ_SCAN_FLAG_RAW_ENCODER    (0x1<<1)
+#define RPLIDAR_HQ_SCAN_FLAG_RAW_DISTANCE   (0x1<<2)
+
+typedef struct _rplidar_payload_express_scan_t {
+    u8   working_mode;
+    u16  working_flags;
+    u16  param;
+} __attribute__((packed)) rplidar_payload_express_scan_t;
+
+typedef struct _rplidar_payload_hq_scan_t {
+    u8  flag;
+    u8   reserved[32];
+} __attribute__((packed)) rplidar_payload_hq_scan_t;
+
+typedef struct _rplidar_payload_get_scan_conf_t {
+    u32  type;
+    u8   reserved[32];
+} __attribute__((packed)) rplidar_payload_get_scan_conf_t;
+
 #define MAX_MOTOR_PWM               1023
 #define DEFAULT_MOTOR_PWM           660
+
 typedef struct _rplidar_payload_motor_pwm_t {
     u16 pwm_value;
 } __attribute__((packed)) rplidar_payload_motor_pwm_t;
@@ -142,6 +354,10 @@ bool is_serial_opened = false;
 bool operation_aborted = false;
 bool is_support_motor_ctrl = false;
 bool ctrl_c_pressed = false;
+
+u16 cached_sampleduration_express;
+u16 cached_sampleduration_std;
+u8 cached_express_flag;
 
 int required_tx_cnt = 0;
 int required_rx_cnt = 0;
@@ -180,21 +396,35 @@ typedef struct _rplidar_ans_header_t {
     u8  type;
 } __attribute__((packed)) rplidar_ans_header_t; 
 
-typedef struct _rplidar_response_device_info_t {
-    u8		model;
-    u16		firmware_version;
-    u8		hardware_version;
-    u8		serialnum[16];
-} __attribute__((packed)) rplidar_response_device_info_t;
-
 typedef struct _rplidar_payload_acc_board_flag_t {
     u32 reserved;
 } __attribute__((packed)) rplidar_payload_acc_board_flag_t;
 
-typedef struct _rplidar_response_device_health_t {
-    u8   status;
-    u16  error_code;
-} __attribute__((packed)) rplidar_response_device_health_t;
+typedef struct _RplidarScanMode {
+    u16    id;
+    float   us_per_sample;   // microseconds per sample
+    float   max_distance;    // max distance
+    u8     ans_type;         // the answer type of the scam mode, its value should be RPLIDAR_ANS_TYPE_MEASUREMENT*
+    char    scan_mode[64];    // name of scan mode, max 63 characters
+} RplidarScanMode;
+
+#define DRIVER_TYPE_SERIALPORT	(0x0)
+#define DRIVER_TYPE_TCP			(0x1)
+
+// It's for C Based C++ STL vector
+MAKE_VECTOR_TYPE(u8)
+
+typedef unsigned long  _word_size_t;
+typedef _word_size_t (* thread_proc_t) (void *);
+
+typedef struct _sdf
+{
+	void *data;
+	thread_proc_t func;
+	_word_size_t handle;
+} thread_proc;
+
+thread_proc *_cachethread;
 
 void clear_dtr(void);
 
@@ -545,7 +775,7 @@ u_result check_motor_ctrl_support(bool support, u32 timeout)
 	u_result	ans;
 	support = false;
 
-	size_t returned_size;
+	size_t *returned_size = NULL;
 
 	rplidar_response_acc_board_flag_t acc_board_flag;
 	rplidar_payload_acc_board_flag_t flag;
@@ -579,7 +809,7 @@ u_result check_motor_ctrl_support(bool support, u32 timeout)
 			return RESULT_INVALID_DATA;
 		}
 
-		if (!waitfordata(header_size, timeout, &returned_size)) {
+		if (!waitfordata(header_size, timeout, returned_size)) {
 			return RESULT_OPERATION_TIMEOUT;
 		}
 
@@ -629,14 +859,12 @@ static inline void delay(u32 ms)
 
 u_result start_motor(void)
 {
-    if (is_supporting_motor_ctrl)
-	{
-		// RPLIDAR A2
-        set_motor_PWM(DEFAULT_MOTOR_PWM);
-        delay(500); 
-        return RESULT_OK; 
-    }
-	else
+	// RPLIDAR A2
+    set_motor_PWM(DEFAULT_MOTOR_PWM);
+    delay(500); 
+    return RESULT_OK; 
+
+#if 0
 	{
 		// RPLIDAR A1
 		pthread_mutex_lock(&serial_mtx);
@@ -648,17 +876,21 @@ u_result start_motor(void)
 
         return RESULT_OK;
     }
+#endif
 }
 
 u_result stop(u32 timeout)
 {
     u_result ans;
+	void *payload = NULL;
+	size_t payloadsize = 0;
+
     disable_data_grab();
 
     {
 		pthread_mutex_lock(&serial_mtx);
 
-        if (IS_FAIL(ans = send_command(RPLIDAR_CMD_STOP))) {
+        if (IS_FAIL(ans = send_command(RPLIDAR_CMD_STOP, payload, payloadsize))) {
             return ans;
         }
 
@@ -749,7 +981,7 @@ u_result get_device_info(rplidar_response_device_info_t *info, u32 timeout)
         if (!waitfordata(header_size, timeout, returned_size)) {
             return RESULT_OPERATION_TIMEOUT;
         }
-        recvdata((u8 *)(info), sizeof(info));
+        recvdata((u8 *)(info), sizeof(*info));
 
 		pthread_mutex_unlock(&serial_mtx);
     }
@@ -760,7 +992,12 @@ u_result get_health(rplidar_response_device_health_t *healthinfo, u32 timeout)
 {
     u_result  ans;
 	rplidar_ans_header_t response_header;
+	
 	u32 header_size;
+
+	void *payload = NULL;
+	size_t payloadsize = 0;
+	size_t *returned_size = NULL;
 
     if (!connected())
 		return RESULT_OPERATION_FAIL;
@@ -770,7 +1007,7 @@ u_result get_health(rplidar_response_device_health_t *healthinfo, u32 timeout)
     {
 		pthread_mutex_lock(&serial_mtx);
 
-        if (IS_FAIL(ans = send_command(RPLIDAR_CMD_GET_DEVICE_HEALTH))) {
+        if (IS_FAIL(ans = send_command(RPLIDAR_CMD_GET_DEVICE_HEALTH, payload, payloadsize))) {
             return ans;
         }
 
@@ -788,10 +1025,10 @@ u_result get_health(rplidar_response_device_health_t *healthinfo, u32 timeout)
             return RESULT_INVALID_DATA;
         }
 
-         if (!waitfordata(header_size, timeout)) {
+        if (!waitfordata(header_size, timeout, returned_size)) {
             return RESULT_OPERATION_TIMEOUT;
         }
-        recvdata((u8 *)(healthinfo), sizeof(healthinfo));
+        recvdata((u8 *)(healthinfo), sizeof(*healthinfo));
 
 		pthread_mutex_unlock(&serial_mtx);
     }
@@ -827,12 +1064,12 @@ bool check_RPLIDAR_health(void)
     }
 }
 
-u_result check_support_config_commands(bool& outSupport, u32 timeoutInMs)
+u_result check_support_config_commands(bool *outSupport, u32 timeoutInMs)
 {
     u_result ans;
 
     rplidar_response_device_info_t devinfo;
-    ans = get_device_info(devinfo, timeoutInMs);
+    ans = get_device_info(&devinfo, timeoutInMs);
 
     if (IS_FAIL(ans))
 		return ans;
@@ -840,13 +1077,14 @@ u_result check_support_config_commands(bool& outSupport, u32 timeoutInMs)
     // if lidar firmware >= 1.24
     if (devinfo.firmware_version >= ((0x1 << 8) | 24))
 	{
-        outSupport = true;
+        *outSupport = true;
     }
 
     return ans;
 }
 
-u_result get_lidar_conf(u32 type, std::vector<u8> &outputBuf, const std::vector<u8> &reserve, _u32 timeout)
+//u_result get_lidar_conf(u32 type, std::vector<u8> &outputBuf, const std::vector<u8> &reserve, _u32 timeout)
+u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, const vector_u8 *reserve, u32 timeout)
 {
 	rplidar_ans_header_t response_header;
     rplidar_payload_get_scan_conf_t query;
@@ -856,10 +1094,16 @@ u_result get_lidar_conf(u32 type, std::vector<u8> &outputBuf, const std::vector<
     u_result ans;
 
 	//std::vector<u8> dataBuf;
+	//vector_u8 dataBuf;
+	VECTOR_OF(u8) dataBuf;
 	int payLoadLen;
 
-    int sizeVec = reserve.size();
+    //int sizeVec = reserve.size();
+	// Needs STL vector size() method: VECTOR_SIZE
+    int sizeVec = reserve->size();
 	int maxLen;
+
+	size_t *returned_size = NULL;
 
     memset(&query, 0, sizeof(query));
     query.type = type;
@@ -893,12 +1137,12 @@ u_result get_lidar_conf(u32 type, std::vector<u8> &outputBuf, const std::vector<
             return RESULT_INVALID_DATA;
         }
 
-        if (!waitfordata(header_size, timeout)) {
+        if (!waitfordata(header_size, timeout, returned_size)) {
             return RESULT_OPERATION_TIMEOUT;
         }
 
         dataBuf.resize(header_size);
-        recvdata(reinterpret_cast<u8 *>(&dataBuf[0]), header_size);
+        recvdata((u8 *)(&dataBuf[0]), header_size);
 
         //check if returned type is same as asked type
         memcpy(&replyType, &dataBuf[0], sizeof(type));
@@ -925,19 +1169,20 @@ u_result get_lidar_conf(u32 type, std::vector<u8> &outputBuf, const std::vector<
     return ans;
 }
 
-u_result get_typical_scan_mode(u16& outMode, u32 timeoutInMs)
+u_result get_typical_scan_mode(u16 *outMode, u32 timeoutInMs)
 {
     u_result ans;
-    std::vector<_u8> answer;
+	vector_u8 answer;
+    //std::vector<u8> answer;
     bool lidar_support_config_cmds = false;
-    ans = check_support_config_commands(lidar_support_config_cmds);
+    ans = check_support_config_commands(&lidar_support_config_cmds, DEFAULT_TIMEOUT);
 
     if (IS_FAIL(ans))
 		return RESULT_INVALID_DATA;
 
     if (lidar_support_config_cmds)
     {
-        ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_TYPICAL, answer, std::vector<_u8>(), timeoutInMs);
+        ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_TYPICAL, answer, std::vector<u8>(), timeoutInMs);
         if (IS_FAIL(ans))
 		{
             return ans;
@@ -949,20 +1194,20 @@ u_result get_typical_scan_mode(u16& outMode, u32 timeoutInMs)
         }
 
         const u16 *p_answer = (const u16 *)(&answer[0]);
-        outMode = *p_answer;
+        *outMode = *p_answer;
         return ans;
     }
     //old version of triangle lidar
     else
     {
-        outMode = RPLIDAR_CONF_SCAN_COMMAND_EXPRESS;
+        *outMode = RPLIDAR_CONF_SCAN_COMMAND_EXPRESS;
         return ans;
     }
 
     return ans;
 }
 
-_result get_lidar_sample_duration(float& sampleDurationRes, u16 scanModeID, u32 timeoutInMs)
+u_result get_lidar_sample_duration(float *sampleDurationRes, u16 scanModeID, u32 timeoutInMs)
 {
     u_result ans;
     std::vector<u8> reserve(2);
@@ -982,11 +1227,11 @@ _result get_lidar_sample_duration(float& sampleDurationRes, u16 scanModeID, u32 
     }
 
     const u32 *result = (const u32 *)(&answer[0]);
-    sampleDurationRes = (float)(*result >> 8);
+    *sampleDurationRes = (float)(*result >> 8);
     return ans;
 }
 
-u_result get_max_distance(float &maxDistance, u16 scanModeID, u32 timeoutInMs)
+u_result get_max_distance(float *maxDistance, u16 scanModeID, u32 timeoutInMs)
 {
     u_result ans;
     std::vector<u8> reserve(2);
@@ -1006,11 +1251,11 @@ u_result get_max_distance(float &maxDistance, u16 scanModeID, u32 timeoutInMs)
     }
 
     const u32 *result = (const u32 *)(&answer[0]);
-    maxDistance = (float)(*result >> 8);
+    *maxDistance = (float)(*result >> 8);
     return ans;
 }
 
-u_result get_scan_mode_ans_type(u8 &ansType, u16 scanModeID, u32 timeoutInMs)
+u_result get_scan_mode_ans_type(u8 *ansType, u16 scanModeID, u32 timeoutInMs)
 {
     u_result ans;
     std::vector<u8> reserve(2);
@@ -1030,7 +1275,7 @@ u_result get_scan_mode_ans_type(u8 &ansType, u16 scanModeID, u32 timeoutInMs)
     }
 
     const u8 *result = (const u8 *)(&answer[0]);
-    ansType = *result;
+    *ansType = *result;
     return ans;
 }
 
@@ -1057,10 +1302,15 @@ u_result get_scan_mode_name(char* modeName, u16 scanModeID, u32 timeoutInMs)
     return ans;
 }
 
-u_result get_sample_duration_us(rplidar_response_sample_rate_t & rateInfo, _u32 timeout)
+u_result get_sample_duration_us(rplidar_response_sample_rate_t *rateInfo, u32 timeout)
 {
 	rplidar_ans_header_t response_header;
     rplidar_response_device_info_t devinfo;
+
+	void *payload = NULL;
+	size_t payloadsize = 0;
+
+	size_t *returned_size = NULL;
 
 	u32 header_size;
 
@@ -1074,10 +1324,10 @@ u_result get_sample_duration_us(rplidar_response_sample_rate_t & rateInfo, _u32 
     disable_data_grab();
 
     // 1. fetch the device version first...
-    ans = get_device_info(devinfo, timeout);
+    ans = get_device_info(&devinfo, timeout);
 
-    rateInfo.express_sample_duration_us = _cached_sampleduration_express;
-    rateInfo.std_sample_duration_us = _cached_sampleduration_std;
+    rateInfo->express_sample_duration_us = cached_sampleduration_express;
+    rateInfo->std_sample_duration_us = cached_sampleduration_std;
 
     if (devinfo.firmware_version < ((0x1<<8) | 17)) {
         // provide fake data...
@@ -1088,7 +1338,7 @@ u_result get_sample_duration_us(rplidar_response_sample_rate_t & rateInfo, _u32 
     {
 		pthread_mutex_lock(&serial_mtx);
 
-        if (IS_FAIL(ans = send_command(RPLIDAR_CMD_GET_SAMPLERATE))) {
+        if (IS_FAIL(ans = send_command(RPLIDAR_CMD_GET_SAMPLERATE, payload, payloadsize))) {
             return ans;
         }
 
@@ -1106,15 +1356,440 @@ u_result get_sample_duration_us(rplidar_response_sample_rate_t & rateInfo, _u32 
             return RESULT_INVALID_DATA;
         }
 
-        if (!waitfordata(header_size, timeout)) {
+        if (!waitfordata(header_size, timeout, returned_size)) {
             return RESULT_OPERATION_TIMEOUT;
         }
-        recvdata((u8 *)(&rateInfo), sizeof(rateInfo));
+        recvdata((u8 *)(rateInfo), sizeof(*rateInfo));
 
 		pthread_mutex_unlock(&serial_mtx);
     }
 
     return RESULT_OK;
+}
+
+#if 0
+u_result _cacheCapsuledScanData()
+{
+    rplidar_response_capsule_measurement_nodes_t    capsule_node;
+    rplidar_response_measurement_node_hq_t   local_buf[128];
+    size_t                                   count = 128;
+    rplidar_response_measurement_node_hq_t   local_scan[MAX_SCAN_NODES];
+    size_t                                   scan_count = 0;
+    u_result                                 ans;
+    memset(local_scan, 0, sizeof(local_scan));
+
+    _waitCapsuledNode(capsule_node); // // always discard the first data since it may be incomplete
+
+    while(_isScanning)
+    {
+        if (IS_FAIL(ans=_waitCapsuledNode(capsule_node))) {
+            if (ans != RESULT_OPERATION_TIMEOUT && ans != RESULT_INVALID_DATA) {
+                _isScanning = false;
+                return RESULT_OPERATION_FAIL;
+            } else {
+                // current data is invalid, do not use it.
+                continue;
+            }
+        }
+
+        switch (_cached_express_flag)
+        {
+	        case 0:
+    	        _capsuleToNormal(capsule_node, local_buf, count);
+        	    break;
+        	case 1:
+            	_dense_capsuleToNormal(capsule_node, local_buf, count);
+            	break;
+        }
+
+		for (size_t pos = 0; pos < count; ++pos)
+        {
+            if (local_buf[pos].flag & RPLIDAR_RESP_MEASUREMENT_SYNCBIT)
+            {
+                // only publish the data when it contains a full 360 degree scan 
+
+                if ((local_scan[0].flag & RPLIDAR_RESP_MEASUREMENT_SYNCBIT)) {
+                    _lock.lock();
+                    memcpy(_cached_scan_node_hq_buf, local_scan, scan_count*sizeof(rplidar_response_measurement_node_hq_t));
+                    _cached_scan_node_hq_count = scan_count;
+                    _dataEvt.set();
+                    _lock.unlock();
+                }
+                scan_count = 0;
+            }
+
+            local_scan[scan_count++] = local_buf[pos];
+            if (scan_count == _countof(local_scan)) scan_count-=1; // prevent overflow
+
+            //for interval retrieve
+            {
+                rp::hal::AutoLocker l(_lock);
+                _cached_scan_node_hq_buf_for_interval_retrieve[_cached_scan_node_hq_count_for_interval_retrieve++] = local_buf[pos];
+                if(_cached_scan_node_hq_count_for_interval_retrieve == _countof(_cached_scan_node_hq_buf_for_interval_retrieve)) _cached_scan_node_hq_count_for_interval_retrieve-=1; // prevent overflow
+            }
+        }
+    }
+    _isScanning = false;
+
+    return RESULT_OK;
+}
+#endif
+
+u_result RPlidarDriverImplCommon::_waitUltraCapsuledNode(rplidar_response_ultra_capsule_measurement_nodes_t & node, _u32 timeout)
+{
+    int  recvPos = 0;
+    _u32 startTs = getms();
+    _u8  recvBuffer[sizeof(rplidar_response_ultra_capsule_measurement_nodes_t)];
+    _u8 *nodeBuffer = (_u8*)&node;
+    _u32 waitTime;
+
+    if (!is_connected) {
+        return RESULT_OPERATION_FAIL;
+    }
+
+    while ((waitTime=getms() - startTs) <= timeout) {
+        size_t remainSize = sizeof(rplidar_response_ultra_capsule_measurement_nodes_t) - recvPos;
+        size_t recvSize;
+
+        bool ans = waitfordata(remainSize, timeout-waitTime, &recvSize);
+        if(!ans)
+        {
+            return RESULT_OPERATION_TIMEOUT;
+        }
+        if (recvSize > remainSize) recvSize = remainSize;
+
+        recvSize = recvdata(recvBuffer, recvSize);
+
+        for (size_t pos = 0; pos < recvSize; ++pos) {
+            u8 currentByte = recvBuffer[pos];
+            switch (recvPos) {
+				case 0: // expect the sync bit 1
+                {
+                    u8 tmp = (currentByte>>4);
+                    if ( tmp == RPLIDAR_RESP_MEASUREMENT_EXP_SYNC_1 ) {
+                    // pass
+                    }
+                    else {
+                        _is_previous_capsuledataRdy = false;
+                        continue;
+                    }
+                }
+	            break;
+    	        case 1: // expect the sync bit 2
+    	        {
+        	        _u8 tmp = (currentByte>>4);
+            	    if (tmp == RPLIDAR_RESP_MEASUREMENT_EXP_SYNC_2) {
+                    	// pass
+                	}
+                	else
+					{
+                    	recvPos = 0;
+                    	_is_previous_capsuledataRdy = false;
+                    	continue;
+                	}
+            	}
+            	break;
+            }
+
+            nodeBuffer[recvPos++] = currentByte;
+            if (recvPos == sizeof(rplidar_response_ultra_capsule_measurement_nodes_t))
+			{
+				// calc the checksum ...
+                u8 checksum = 0;
+                u8 recvChecksum = ((node.s_checksum_1 & 0xF) | (node.s_checksum_2 << 4));
+
+                for (size_t cpos = offsetof(rplidar_response_ultra_capsule_measurement_nodes_t, start_angle_sync_q6);
+                cpos < sizeof(rplidar_response_ultra_capsule_measurement_nodes_t); ++cpos)
+                {
+                    checksum ^= nodeBuffer[cpos];
+                }
+
+                if (recvChecksum == checksum)
+                {
+                    // only consider vaild if the checksum matches...
+                    if (node.start_angle_sync_q6 & RPLIDAR_RESP_MEASUREMENT_EXP_SYNCBIT)
+                    {
+                        // this is the first capsule frame in logic, discard the previous cached data...
+                        _is_previous_capsuledataRdy = false;
+                        return RESULT_OK;
+                    }
+                    return RESULT_OK;
+                }
+                _is_previous_capsuledataRdy = false;
+                return RESULT_INVALID_DATA;
+            }
+        }
+    }
+    _is_previous_capsuledataRdy = false;
+    return RESULT_OPERATION_TIMEOUT;
+}
+
+static u32 _varbitscale_decode(u32 scaled, u32 & scaleLevel)
+{
+    static const _u32 VBS_SCALED_BASE[] = {
+        RPLIDAR_VARBITSCALE_X16_DEST_VAL,
+        RPLIDAR_VARBITSCALE_X8_DEST_VAL,
+        RPLIDAR_VARBITSCALE_X4_DEST_VAL,
+        RPLIDAR_VARBITSCALE_X2_DEST_VAL,
+        0,
+    };
+
+    static const _u32 VBS_SCALED_LVL[] = {
+        4,
+        3,
+        2,
+        1,
+        0,
+    };
+
+    static const _u32 VBS_TARGET_BASE[] = {
+        (0x1 << RPLIDAR_VARBITSCALE_X16_SRC_BIT),
+        (0x1 << RPLIDAR_VARBITSCALE_X8_SRC_BIT),
+        (0x1 << RPLIDAR_VARBITSCALE_X4_SRC_BIT),
+        (0x1 << RPLIDAR_VARBITSCALE_X2_SRC_BIT),
+        0,
+    };
+
+    for (size_t i = 0; i < _countof(VBS_SCALED_BASE); ++i)
+    {
+        int remain = ((int)scaled - (int)VBS_SCALED_BASE[i]);
+        if (remain >= 0) {
+            scaleLevel = VBS_SCALED_LVL[i];
+            return VBS_TARGET_BASE[i] + (remain << scaleLevel);
+        }
+    }
+    return 0;
+}
+
+void RPlidarDriverImplCommon::_ultraCapsuleToNormal(const rplidar_response_ultra_capsule_measurement_nodes_t & capsule, rplidar_response_measurement_node_hq_t *nodebuffer, size_t &nodeCount)
+{
+    nodeCount = 0;
+
+    if (_is_previous_capsuledataRdy)
+	{
+        int diffAngle_q8;
+        int currentStartAngle_q8 = ((capsule.start_angle_sync_q6 & 0x7FFF) << 2);
+        int prevStartAngle_q8 = ((_cached_previous_ultracapsuledata.start_angle_sync_q6 & 0x7FFF) << 2);
+
+        diffAngle_q8 = (currentStartAngle_q8) - (prevStartAngle_q8);
+        if (prevStartAngle_q8 >  currentStartAngle_q8) {
+            diffAngle_q8 += (360 << 8);
+        }
+
+        int angleInc_q16 = (diffAngle_q8 << 3) / 3;
+        int currentAngle_raw_q16 = (prevStartAngle_q8 << 8);
+        for (size_t pos = 0; pos < _countof(_cached_previous_ultracapsuledata.ultra_cabins); ++pos)
+        {
+            int dist_q2[3];
+            int angle_q6[3];
+            int syncBit[3];
+
+            _u32 combined_x3 = _cached_previous_ultracapsuledata.ultra_cabins[pos].combined_x3;
+
+            // unpack ...
+            int dist_major = (combined_x3 & 0xFFF);
+
+            // signed partical integer, using the magic shift here
+            // DO NOT TOUCH
+
+            int dist_predict1 = (((int)(combined_x3 << 10)) >> 22);
+            int dist_predict2 = (((int)combined_x3) >> 22);
+
+            int dist_major2;
+
+            _u32 scalelvl1, scalelvl2;
+
+			// prefetch next ...
+            if (pos == _countof(_cached_previous_ultracapsuledata.ultra_cabins) - 1)
+            {
+                dist_major2 = (capsule.ultra_cabins[0].combined_x3 & 0xFFF);
+            }
+            else {
+                dist_major2 = (_cached_previous_ultracapsuledata.ultra_cabins[pos + 1].combined_x3 & 0xFFF);
+            }
+
+            // decode with the var bit scale ...
+            dist_major = _varbitscale_decode(dist_major, scalelvl1);
+            dist_major2 = _varbitscale_decode(dist_major2, scalelvl2);
+
+            int dist_base1 = dist_major;
+            int dist_base2 = dist_major2;
+
+            if ((!dist_major) && dist_major2) {
+                dist_base1 = dist_major2;
+                scalelvl1 = scalelvl2;
+            }
+
+            dist_q2[0] = (dist_major << 2);
+            if ((dist_predict1 == 0xFFFFFE00) || (dist_predict1 == 0x1FF)) {
+                dist_q2[1] = 0;
+            } else {
+                dist_predict1 = (dist_predict1 << scalelvl1);
+                dist_q2[1] = (dist_predict1 + dist_base1) << 2;
+
+            }
+
+            if ((dist_predict2 == 0xFFFFFE00) || (dist_predict2 == 0x1FF)) {
+                dist_q2[2] = 0;
+            } else {
+                dist_predict2 = (dist_predict2 << scalelvl2);
+                dist_q2[2] = (dist_predict2 + dist_base2) << 2;
+            }
+
+			for (int cpos = 0; cpos < 3; ++cpos)
+            {
+
+                syncBit[cpos] = (((currentAngle_raw_q16 + angleInc_q16) % (360 << 16)) < angleInc_q16) ? 1 : 0;
+
+                int offsetAngleMean_q16 = (int)(7.5 * 3.1415926535 * (1 << 16) / 180.0);
+
+                if (dist_q2[cpos] >= (50 * 4))
+                {
+                    const int k1 = 98361;
+                    const int k2 = int(k1 / dist_q2[cpos]);
+
+                    offsetAngleMean_q16 = (int)(8 * 3.1415926535 * (1 << 16) / 180) - (k2 << 6) - (k2 * k2 * k2) / 98304;
+                }
+
+                angle_q6[cpos] = ((currentAngle_raw_q16 - int(offsetAngleMean_q16 * 180 / 3.14159265)) >> 10);
+                currentAngle_raw_q16 += angleInc_q16;
+
+                if (angle_q6[cpos] < 0) angle_q6[cpos] += (360 << 6);
+                if (angle_q6[cpos] >= (360 << 6)) angle_q6[cpos] -= (360 << 6);
+
+                rplidar_response_measurement_node_hq_t node;
+
+                node.flag = (syncBit[cpos] | ((!syncBit[cpos]) << 1));
+                node.quality = dist_q2[cpos] ? (0x2F << RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT) : 0;
+                node.angle_z_q14 = _u16((angle_q6[cpos] << 8) / 90);
+                node.dist_mm_q2 = dist_q2[cpos];
+
+                nodebuffer[nodeCount++] = node;
+            }
+        }
+    }
+
+    _cached_previous_ultracapsuledata = capsule;
+    _is_previous_capsuledataRdy = true;
+}
+
+u_result _cacheUltraCapsuledScanData()
+{
+    rplidar_response_ultra_capsule_measurement_nodes_t    ultra_capsule_node;
+    rplidar_response_measurement_node_hq_t   local_buf[128];
+    size_t                                   count = 128;
+    rplidar_response_measurement_node_hq_t   local_scan[MAX_SCAN_NODES];
+    size_t                                   scan_count = 0;
+    u_result                                 ans;
+    memset(local_scan, 0, sizeof(local_scan));
+
+    _waitUltraCapsuledNode(ultra_capsule_node);
+
+    while(is_scanning)
+    {
+        if (IS_FAIL(ans=_waitUltraCapsuledNode(ultra_capsule_node))) {
+            if (ans != RESULT_OPERATION_TIMEOUT && ans != RESULT_INVALID_DATA) {
+                is_scanning = false;
+                return RESULT_OPERATION_FAIL;
+            } else {
+                // current data is invalid, do not use it.
+                continue;
+            }
+        }
+
+        _ultraCapsuleToNormal(ultra_capsule_node, local_buf, count);
+
+		for (size_t pos = 0; pos < count; ++pos)
+        {
+            if (local_buf[pos].flag & RPLIDAR_RESP_MEASUREMENT_SYNCBIT)
+            {
+                // only publish the data when it contains a full 360 degree scan 
+
+                if ((local_scan[0].flag & RPLIDAR_RESP_MEASUREMENT_SYNCBIT)) {
+                    _lock.lock();
+                    memcpy(_cached_scan_node_hq_buf, local_scan, scan_count*sizeof(rplidar_response_measurement_node_hq_t));
+                    _cached_scan_node_hq_count = scan_count;
+                    _dataEvt.set();
+                    _lock.unlock();
+                }
+                scan_count = 0;
+            }
+            local_scan[scan_count++] = local_buf[pos];
+            if (scan_count == _countof(local_scan)) scan_count-=1; // prevent overflow
+
+            //for interval retrieve
+            {
+                rp::hal::AutoLocker l(_lock);
+                _cached_scan_node_hq_buf_for_interval_retrieve[_cached_scan_node_hq_count_for_interval_retrieve++] = local_buf[pos];
+                if(_cached_scan_node_hq_count_for_interval_retrieve == _countof(_cached_scan_node_hq_buf_for_interval_retrieve)) _cached_scan_node_hq_count_for_interval_retrieve-=1; // prevent overflow
+            }
+        }
+    }
+
+    is_scanning = false;
+
+    return RESULT_OK;
+}
+
+// Current Case: _cacheUltraCapsuledScanData
+
+//TODO: Make it Polymorphism
+//_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheScanData);
+//_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheUltraCapsuledScanData);
+//_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheHqScanData);
+//_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheCapsuledScanData);
+
+// CLASS_THREAD(RPlidarDriverImplCommon, _cacheUltraCapsuledScanData);
+// create_member<RPlidarDriverImplCommon, &RPlidarDriverImplCommon::_cacheUltraCapsuledScanData>(this)
+// create_member<thread_proc, _cacheUltraCapsuledScanData>(this)
+// create_member()
+//     return create( (RPlidarDriverImplCommon *)((
+
+//#define CLASS_THREAD(c , x ) \
+//    rp::hal::Thread::create_member<c, &c::x>(this)
+
+#define CLASS_THREAD(x)		create_member()
+
+//Thread Thread::create(thread_proc_t proc, void * data)
+thread_proc *create(thread_proc_t proc)
+{
+#if 0
+typedef struct _sdf
+{
+    void *data;
+    thread_proc_t func;
+    _word_size_t handle;
+} thread_proc;
+#endif
+	thread_proc *newborn = (thread_proc *)malloc(sizeof(thread_proc));
+	//(proc, data);
+	newborn->func = proc;
+	newborn->data = NULL;
+
+	// tricky code, we assume pthread_t is not a structure but a word size value
+	assert( sizeof(newborn->handle) >= sizeof(pthread_t));
+
+	pthread_create((pthread_t *)&newborn->handle, NULL, (void * (*)(void *))proc, newborn->data);
+
+	return newborn;
+}
+
+//template <class T, u_result (T::*PROC)(void) >
+static _word_size_t _thread_thunk(void *data)
+{
+	//return (static_cast<T *>(data)->*PROC)();
+	//return (static_cast<thread_proc *>(data)->*_cacheUltraCapsuledScanData)();
+	//return ((thread_proc *)((data)->*_cacheUltraCapsuledScanData))();
+	return (thread_proc *)_cacheUltraCapsuledScanData();
+}
+
+//template <class T, u_result (T::*PROC)(void)>
+//static Thread create_member(T * pthis)
+static thread_proc create_member(void)
+{
+	//return create(_thread_thunk<T,PROC>, pthis);
+	//return create(_thread_thunk<thread_proc, _cacheUltraCapsuledScanData>, pthis);
+	return create(_thread_thunk);
 }
 
 u_result start_scan_express(bool force, u16 scanMode, u32 options, RplidarScanMode *outUsedScanMode, u32 timeout)
@@ -1128,20 +1803,20 @@ u_result start_scan_express(bool force, u16 scanMode, u32 options, RplidarScanMo
     u8 scanAnsType;
     u_result ans;
 
-    if (!isConnected())
+    if (!connected())
 		return RESULT_OPERATION_FAIL;
 
     if (is_scanning)
 		return RESULT_ALREADY_DONE;
 
-    stop(); //force the previous operation to stop
+    stop(DEFAULT_TIMEOUT); //force the previous operation to stop
 
     if (scanMode == RPLIDAR_CONF_SCAN_COMMAND_STD)
     {
         return start_scan(force, false, 0, outUsedScanMode);
     }
 
-    ans = check_support_config_commands(if_support_lidar_conf);
+    ans = check_support_config_commands(&if_support_lidar_conf, DEFAULT_TIMEOUT);
 
     if (IS_FAIL(ans))
 		return RESULT_INVALID_DATA;
@@ -1152,25 +1827,25 @@ u_result start_scan_express(bool force, u16 scanMode, u32 options, RplidarScanMo
 
         if (if_support_lidar_conf)
         {
-            ans = get_lidar_sample_duration(outUsedScanMode->us_per_sample, outUsedScanMode->id);
+            ans = get_lidar_sample_duration(&(outUsedScanMode->us_per_sample), outUsedScanMode->id, DEFAULT_TIMEOUT);
 			if (IS_FAIL(ans))
             {
                 return RESULT_INVALID_DATA;
             }
 
-            ans = get_max_distance(outUsedScanMode->max_distance, outUsedScanMode->id);
+            ans = get_max_distance(&(outUsedScanMode->max_distance), outUsedScanMode->id, DEFAULT_TIMEOUT);
             if (IS_FAIL(ans))
             {
                 return RESULT_INVALID_DATA;
             }
 
-            ans = get_scan_mode_ans_type(outUsedScanMode->ans_type, outUsedScanMode->id);
+            ans = get_scan_mode_ans_type(&(outUsedScanMode->ans_type), outUsedScanMode->id, DEFAULT_TIMEOUT);
             if (IS_FAIL(ans))
             {
                 return RESULT_INVALID_DATA;
             }
 
-            ans = get_scan_mode_name(outUsedScanMode->scan_mode, outUsedScanMode->id);
+            ans = get_scan_mode_name(outUsedScanMode->scan_mode, outUsedScanMode->id, DEFAULT_TIMEOUT);
             if (IS_FAIL(ans))
             {
                 return RESULT_INVALID_DATA;
@@ -1179,7 +1854,7 @@ u_result start_scan_express(bool force, u16 scanMode, u32 options, RplidarScanMo
         else
         {
 			rplidar_response_sample_rate_t sampleRateTmp;
-            ans = getSampleDuration_uS(sampleRateTmp);
+            ans = get_sample_duration_us(&sampleRateTmp, DEFAULT_TIMEOUT);
 
             if (IS_FAIL(ans))
 				return RESULT_INVALID_DATA;
@@ -1192,9 +1867,9 @@ u_result start_scan_express(bool force, u16 scanMode, u32 options, RplidarScanMo
     }
 
     //get scan answer type to specify how to wait data
-    if (ifSupportLidarConf)
+    if (if_support_lidar_conf)
     {
-        get_scan_mode_ans_type(scanAnsType, scanMode);
+        get_scan_mode_ans_type(&scanAnsType, scanMode, DEFAULT_TIMEOUT);
     }
     else
     {
@@ -1206,15 +1881,16 @@ u_result start_scan_express(bool force, u16 scanMode, u32 options, RplidarScanMo
 
         memset(&scanReq, 0, sizeof(scanReq));
         if (scanMode != RPLIDAR_CONF_SCAN_COMMAND_STD && scanMode != RPLIDAR_CONF_SCAN_COMMAND_EXPRESS)
-            scanReq.working_mode = _u8(scanMode);
+            scanReq.working_mode = (u8)(scanMode);
+
         scanReq.working_flags = options;
 
-        if (IS_FAIL(ans = _sendCommand(RPLIDAR_CMD_EXPRESS_SCAN, &scanReq, sizeof(scanReq)))) {
+        if (IS_FAIL(ans = send_command(RPLIDAR_CMD_EXPRESS_SCAN, &scanReq, sizeof(scanReq)))) {
             return ans;
         }
 
         // waiting for confirmation
-        if (IS_FAIL(ans = _waitResponseHeader(&response_header, timeout))) {
+        if (IS_FAIL(ans = wait_response_header(&response_header, timeout))) {
             return ans;
         }
 
@@ -1230,36 +1906,41 @@ u_result start_scan_express(bool force, u16 scanMode, u32 options, RplidarScanMo
             if (header_size < sizeof(rplidar_response_capsule_measurement_nodes_t)) {
                 return RESULT_INVALID_DATA;
             }
-            _cached_express_flag = 0;
-            _isScanning = true;
-            _cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheCapsuledScanData);
+            cached_express_flag = 0;
+            is_scanning = true;
+			// pthread_create((pthread_t *)&newborn._handle, NULL, (void * (*)(void *))proc, data);
+            //_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheCapsuledScanData);
         }
         else if (scanAnsType == RPLIDAR_ANS_TYPE_MEASUREMENT_DENSE_CAPSULED)
         {
 			if (header_size < sizeof(rplidar_response_capsule_measurement_nodes_t)) {
                 return RESULT_INVALID_DATA;
             }
-            _cached_express_flag = 1;
-            _isScanning = true;
-            _cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheCapsuledScanData);
+            cached_express_flag = 1;
+            is_scanning = true;
+            //_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheCapsuledScanData);
         }
         else if (scanAnsType == RPLIDAR_ANS_TYPE_MEASUREMENT_HQ) {
             if (header_size < sizeof(rplidar_response_hq_capsule_measurement_nodes_t)) {
                 return RESULT_INVALID_DATA;
             }
-            _isScanning = true;
-            _cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheHqScanData);
+            is_scanning = true;
+            //_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheHqScanData);
         }
         else
         {
             if (header_size < sizeof(rplidar_response_ultra_capsule_measurement_nodes_t)) {
                 return RESULT_INVALID_DATA;
             }
-            _isScanning = true;
-            _cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheUltraCapsuledScanData);
+            is_scanning = true;
+			// pthread_create((pthread_t *)&newborn._handle, NULL, (void * (*)(void *))proc, data);
+            //_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheUltraCapsuledScanData);
+            _cachethread = CLASS_THREAD(_cacheUltraCapsuledScanData);
         }
 
-        if (_cachethread.getHandle() == 0) {
+        //if (_cachethread.getHandle() == 0) {
+		if (_cachethread->handle == 0)
+		{
             return RESULT_OPERATION_FAIL;
         }
 
@@ -1276,7 +1957,7 @@ u_result check_express_scan_supported(bool & support, u32 timeout)
     rplidar_response_device_info_t devinfo;
 
     support = false;
-    u_result ans = get_device_info(devinfo, timeout);
+    u_result ans = get_device_info(&devinfo, timeout);
 
     if (IS_FAIL(ans))
 		return ans;
@@ -1285,9 +1966,9 @@ u_result check_express_scan_supported(bool & support, u32 timeout)
 	{
         support = true;
         rplidar_response_sample_rate_t sample_rate;
-        get_sample_duration_us(sample_rate);
-        _cached_sampleduration_express = sample_rate.express_sample_duration_us;
-        _cached_sampleduration_std = sample_rate.std_sample_duration_us;
+        get_sample_duration_us(&sample_rate, DEFAULT_TIMEOUT);
+        cached_sampleduration_express = sample_rate.express_sample_duration_us;
+        cached_sampleduration_std = sample_rate.std_sample_duration_us;
     }
 
     return RESULT_OK;
@@ -1300,18 +1981,21 @@ u_result RPlidarDriverImplCommon::startScanNormal(bool force,  _u32 timeout)
 
 	rplidar_ans_header_t response_header;
 
+	void *payload = NULL;
+	size_t payloadsize = 0;
+
     if (!connected())
 		return RESULT_OPERATION_FAIL;
 
-    if (_isScanning)
+    if (is_scanning)
 		return RESULT_ALREADY_DONE;
 
-    stop(); //force the previous operation to stop
+    stop(DEFAULT_TIMEOUT); //force the previous operation to stop
 
     {
 		pthread_mutex_lock(&serial_mtx);
 
-        if (IS_FAIL(ans = send_command(force?RPLIDAR_CMD_FORCE_SCAN:RPLIDAR_CMD_SCAN)))
+        if (IS_FAIL(ans = send_command(force?RPLIDAR_CMD_FORCE_SCAN:RPLIDAR_CMD_SCAN, payload, payloadsize)))
 		{
             return ans;
         }
@@ -1334,8 +2018,8 @@ u_result RPlidarDriverImplCommon::startScanNormal(bool force,  _u32 timeout)
             return RESULT_INVALID_DATA;
         }
 
-        _isScanning = true;
-        _cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheScanData);
+        is_scanning = true;
+        //_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheScanData);
 
         if (_cachethread.getHandle() == 0)
 		{
@@ -1353,7 +2037,7 @@ u_result start_scan(bool force, bool use_typical_scan, u32 options, RplidarScanM
     u_result ans;
 
     bool if_support_lidar_conf = false;
-    ans = check_support_config_commands(if_support_lidar_conf);
+    ans = check_support_config_commands(&if_support_lidar_conf, DEFAULT_TIMEOUT);
 
     if (IS_FAIL(ans))
 		return RESULT_INVALID_DATA;
@@ -1364,7 +2048,7 @@ u_result start_scan(bool force, bool use_typical_scan, u32 options, RplidarScanM
         if (if_support_lidar_conf)
         {
             u16 typical_mode;  
-            ans = get_typical_scan_mode(typical_mode);
+            ans = get_typical_scan_mode(&typical_mode);
 
             if (IS_FAIL(ans))
 				return RESULT_INVALID_DATA;
@@ -1396,26 +2080,26 @@ u_result start_scan(bool force, bool use_typical_scan, u32 options, RplidarScanM
         if (outUsedScanMode)
         {
             outUsedScanMode->id = RPLIDAR_CONF_SCAN_COMMAND_STD;
-            ans = get_lidar_sample_duration(outUsedScanMode->us_per_sample, outUsedScanMode->id);
+            ans = get_lidar_sample_duration(&(outUsedScanMode->us_per_sample), outUsedScanMode->id, DEFAULT_TIMEOUT);
 
             if (IS_FAIL(ans))
             {
                 return RESULT_INVALID_DATA;
             }
 
-            ans = get_max_distance(outUsedScanMode->max_distance, outUsedScanMode->id);
+            ans = get_max_distance(&(outUsedScanMode->max_distance), outUsedScanMode->id, DEFAULT_TIMEOUT);
             if (IS_FAIL(ans))
             {
                 return RESULT_INVALID_DATA;
             }
 
-            ans = get_scan_mode_ans_type(outUsedScanMode->ans_type, outUsedScanMode->id);
+            ans = get_scan_mode_ans_type(&(outUsedScanMode->ans_type), outUsedScanMode->id, DEFAULT_TIMEOUT);
             if (IS_FAIL(ans))
             {
                 return RESULT_INVALID_DATA;
             }
 
-            ans = get_scan_mode_name(outUsedScanMode->scan_mode, outUsedScanMode->id);
+            ans = get_scan_mode_name(outUsedScanMode->scan_mode, outUsedScanMode->id, DEFAULT_TIMEOUT);
             if (IS_FAIL(ans))
             {
                 return RESULT_INVALID_DATA;
@@ -1427,7 +2111,7 @@ u_result start_scan(bool force, bool use_typical_scan, u32 options, RplidarScanM
         if (outUsedScanMode)
         {
             rplidar_response_sample_rate_t sampleRateTmp;
-            ans = get_sample_duration_us(sampleRateTmp);
+            ans = get_sample_duration_us(&sampleRateTmp, DEFAULT_TIMEOUT);
 
             if (IS_FAIL(ans))
 				return RESULT_INVALID_DATA;
@@ -1665,7 +2349,7 @@ int main(void)
         }
     }
 
-	stop();
+	stop(DEFAULT_TIMEOUT);
     stop_motor();
 
 on_finished:
