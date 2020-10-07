@@ -4,15 +4,43 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAKE_VECTOR_TYPE(T) \
-typedef struct _vector_##T vector_##T;
+typedef int8_t          s8;
+typedef uint8_t         u8;
 
-#define VECTOR_OF(T)    \
+typedef int16_t         s16;
+typedef uint16_t        u16;
+
+typedef int32_t         s32;
+typedef uint32_t        u32;
+
+typedef int64_t         s64;
+typedef uint64_t        u64;
+
+typedef uint32_t        u_result;
+
+typedef struct _vector_u8
+{
+    u8 *data;
+    unsigned int size;
+    unsigned int capacity;
+} vector_u8;
+
+#if 1
+#define MAKE_VECTOR_TYPE(T) \
+typedef struct _vector_##T vector_##T;	\
 struct _vector_##T { \
     typeof (T) *data; \
     unsigned size; \
     unsigned capacity; \
 }
+#else
+#define VECTOR_OF(T)	\
+struct {	\
+	typeof(T) *data;	\
+	unsigned int size;	\
+	unsigned int capacity;	\
+}
+#endif
 
 #define VECTOR_INIT_ASSIGN(VEC, VAL) do { \
     typeof (VEC) *vec = &(VEC); \
@@ -42,7 +70,16 @@ struct _vector_##T { \
         vec->data[n] = ptr[n]; \
 } while (0)
 
-#define VECTOR_INIT_RESERVE(VEC, N) do { \
+inline void vector_init_reserve(vector_u8 *vec, int num)
+{
+	vec->data = (u8 *)malloc(num * sizeof(*vec->data));
+	vec->size = 0;
+	vec->capacity = num;
+}
+
+#if 0
+#define VECTOR_INIT_RESERVE(VEC, N)		\
+do { \
     typeof (VEC) *vec = &(VEC); \
     unsigned n = (N); \
     vec->data = malloc(n * sizeof *vec->data); \
@@ -50,9 +87,11 @@ struct _vector_##T { \
     vec->capacity = n; \
 } while (0)
 
-#define VECTOR_INIT(VEC) VECTOR_INIT_RESERVE((VEC), 1)
+#define VECTOR_INIT(VEC)		VECTOR_INIT_RESERVE((VEC), 1)
+#define VECTOR_INIT_N(VEC, N)	VECTOR_INIT_RESERVE((VEC), (N))
+#endif
 
-#define VECTOR_SIZE(VEC) (VEC).size
+#define VECTOR_SIZE(VEC) (VEC)->size
 
 #define VECTOR_EMPTY(VEC) ((VEC).size == 0)
 

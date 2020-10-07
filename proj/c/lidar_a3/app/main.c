@@ -13,16 +13,21 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/time.h>
+#include <errno.h>
 
 #include "custom_vector.h"
+#include <stddef.h>
 
 #define EVENT_TIMEOUT	(-1)
 #define EVENT_OK		(1)
+#define EVENT_FAILED	(0)
 
 #define min(a,b)            (((a) < (b)) ? (a) : (b))
 
 #define _countof(_Array) (int)(sizeof(_Array) / sizeof(_Array[0]))
 
+#if 0
 typedef int8_t			s8;
 typedef uint8_t			u8;
 
@@ -36,6 +41,7 @@ typedef int64_t			s64;
 typedef uint64_t		u64;
 
 typedef uint32_t		u_result;
+#endif
 
 #define DEFAULT_TIMEOUT	(2000)
 
@@ -354,6 +360,15 @@ bool is_serial_opened = false;
 bool operation_aborted = false;
 bool is_support_motor_ctrl = false;
 bool ctrl_c_pressed = false;
+bool is_previous_capsule_data_rdy = false;
+
+rplidar_response_ultra_capsule_measurement_nodes_t cached_previous_ultra_capsule_data;
+rplidar_response_measurement_node_hq_t cached_scan_node_hq_buf[8192];
+
+rplidar_response_measurement_node_hq_t cached_scan_node_hq_buf_for_interval_retrieve[8192];
+size_t cached_scan_node_hq_count_for_interval_retrieve;
+
+size_t cached_scan_node_hq_count;
 
 u16 cached_sampleduration_express;
 u16 cached_sampleduration_std;
@@ -363,6 +378,41 @@ int required_tx_cnt = 0;
 int required_rx_cnt = 0;
 
 pthread_mutex_t serial_mtx;
+
+typedef struct _data_event
+{
+	pthread_cond_t         cond_var;
+	pthread_mutex_t        cond_locker;
+	bool                   is_signalled;
+	//bool                   isAutoReset;
+	bool                   is_auto_reset;
+} data_event;
+
+data_event event = { NULL, NULL, false, true };
+
+void event_set(bool isSignal)
+{
+	if (isSignal)
+	{
+		pthread_mutex_lock(&event.cond_locker);
+
+		if (event.is_signalled == false)
+		{
+			event.is_signalled = true;
+			pthread_cond_signal(&event.cond_var);
+		}
+
+		pthread_mutex_unlock(&event.cond_locker);
+	}
+	else
+	{
+		pthread_mutex_lock(&event.cond_locker);
+
+		event.is_signalled = false;
+
+		pthread_mutex_unlock(&event.cond_locker);
+	}
+}
 
 u64 rp_getus(void)
 {
@@ -411,13 +461,27 @@ typedef struct _RplidarScanMode {
 #define DRIVER_TYPE_SERIALPORT	(0x0)
 #define DRIVER_TYPE_TCP			(0x1)
 
+#define MAX_SCAN_NODES			(8192)
+#define LEGACY_SAMPLE_DURATION	(476)
+
+#if 0
 // It's for C Based C++ STL vector
-MAKE_VECTOR_TYPE(u8)
+MAKE_VECTOR_TYPE(u8);
+VECTOR_OF(u8);
+//MAKE_VECTOR_TYPE(u8);
+
+typedef struct _vector_u8
+{
+	u8 *data;
+	unsigned int size;
+	unsigned int capacity;
+} vector_u8;
+#endif
 
 typedef unsigned long  _word_size_t;
 typedef _word_size_t (* thread_proc_t) (void *);
 
-typedef struct _sdf
+typedef struct _thread_proc
 {
 	void *data;
 	thread_proc_t func;
@@ -426,6 +490,7 @@ typedef struct _sdf
 
 thread_proc *_cachethread;
 
+u_result start_scan(bool, bool, u32, RplidarScanMode *);
 void clear_dtr(void);
 
 bool connected()
@@ -925,6 +990,8 @@ u_result stop_motor(void)
 
 bool serial_connect(char *path, unsigned int baudrate)
 {
+	pthread_mutex_init(&event.cond_locker, NULL);
+	pthread_cond_init(&event.cond_var, NULL);
 	pthread_mutex_init(&serial_mtx, NULL);
 	pthread_mutex_lock(&serial_mtx);
 
@@ -1084,7 +1151,9 @@ u_result check_support_config_commands(bool *outSupport, u32 timeoutInMs)
 }
 
 //u_result get_lidar_conf(u32 type, std::vector<u8> &outputBuf, const std::vector<u8> &reserve, _u32 timeout)
-u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, const vector_u8 *reserve, u32 timeout)
+//u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, const vector_u8 *reserve, u32 timeout)
+//u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, vector_u8 *reserve, u32 timeout)
+u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, vector_u8 *reserve, u32 timeout)
 {
 	rplidar_ans_header_t response_header;
     rplidar_payload_get_scan_conf_t query;
@@ -1094,13 +1163,17 @@ u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, const vector_u8 *reserve
     u_result ans;
 
 	//std::vector<u8> dataBuf;
-	//vector_u8 dataBuf;
-	VECTOR_OF(u8) dataBuf;
+	vector_u8 dataBuf;
+	//VECTOR_OF(u8) dataBuf;
+	//VECTOR_INIT(dataBuf);
+	vector_init_reserve(&dataBuf, 1);
 	int payLoadLen;
 
     //int sizeVec = reserve.size();
 	// Needs STL vector size() method: VECTOR_SIZE
-    int sizeVec = reserve->size();
+    //int sizeVec = reserve->size();
+	//int sizeVec = VECTOR_SIZE(reserve);
+	int sizeVec = reserve->size;
 	int maxLen;
 
 	size_t *returned_size = NULL;
@@ -1113,7 +1186,8 @@ u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, const vector_u8 *reserve
 		sizeVec = maxLen;
 
     if (sizeVec > 0)
-        memcpy(query.reserved, &reserve[0], reserve.size());
+        //memcpy(query.reserved, &reserve[0], reserve.size());
+        memcpy(query.reserved, &reserve[0], reserve->size);
 
     {
 		pthread_mutex_lock(&serial_mtx);
@@ -1141,11 +1215,12 @@ u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, const vector_u8 *reserve
             return RESULT_OPERATION_TIMEOUT;
         }
 
-        dataBuf.resize(header_size);
-        recvdata((u8 *)(&dataBuf[0]), header_size);
+        //dataBuf.resize(header_size);
+		dataBuf.size = header_size;
+        recvdata((u8 *)(&(dataBuf.data[0])), header_size);
 
         //check if returned type is same as asked type
-        memcpy(&replyType, &dataBuf[0], sizeof(type));
+        memcpy(&replyType, &dataBuf.data[0], sizeof(type));
 
         if (replyType != type) {
             return RESULT_INVALID_DATA;
@@ -1160,8 +1235,9 @@ u_result get_lidar_conf(u32 type, vector_u8 *outputBuf, const vector_u8 *reserve
         }
 
         //copy all payLoadLen bytes to outputBuf
-        outputBuf.resize(payLoadLen);
-        memcpy(&outputBuf[0], &dataBuf[0] + sizeof(type), payLoadLen);
+        //outputBuf.resize(payLoadLen);
+		outputBuf->size = payLoadLen;
+        memcpy(&(outputBuf->data[0]), &dataBuf.data[0] + sizeof(type), payLoadLen);
 
 		pthread_mutex_unlock(&serial_mtx);
     }
@@ -1173,27 +1249,37 @@ u_result get_typical_scan_mode(u16 *outMode, u32 timeoutInMs)
 {
     u_result ans;
 	vector_u8 answer;
+	vector_u8 reserve;
+	//VECTOR_OF(u8) answer;
+	//VECTOR_OF(u8) reserve;
     //std::vector<u8> answer;
     bool lidar_support_config_cmds = false;
     ans = check_support_config_commands(&lidar_support_config_cmds, DEFAULT_TIMEOUT);
+
+	//VECTOR_INIT(answer);
+	vector_init_reserve(&answer, 1);
+	//VECTOR_INIT(reserve);
+	vector_init_reserve(&reserve, 1);
 
     if (IS_FAIL(ans))
 		return RESULT_INVALID_DATA;
 
     if (lidar_support_config_cmds)
     {
-        ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_TYPICAL, answer, std::vector<u8>(), timeoutInMs);
+        //ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_TYPICAL, answer, std::vector<u8>(), timeoutInMs);
+        ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_TYPICAL, &answer, &reserve, timeoutInMs);
         if (IS_FAIL(ans))
 		{
             return ans;
         }
 
-        if (answer.size() < sizeof(u16))
+        //if (answer.size() < sizeof(u16))
+        if (answer.size < sizeof(u16))
 		{
             return RESULT_INVALID_DATA;
         }
 
-        const u16 *p_answer = (const u16 *)(&answer[0]);
+        const u16 *p_answer = (const u16 *)(&answer.data[0]);
         *outMode = *p_answer;
         return ans;
     }
@@ -1210,23 +1296,32 @@ u_result get_typical_scan_mode(u16 *outMode, u32 timeoutInMs)
 u_result get_lidar_sample_duration(float *sampleDurationRes, u16 scanModeID, u32 timeoutInMs)
 {
     u_result ans;
-    std::vector<u8> reserve(2);
-    memcpy(&reserve[0], &scanModeID, sizeof(scanModeID));
+    //std::vector<u8> reserve(2);
+	vector_u8 reserve;
+    //std::vector<u8> answer;
+	vector_u8 answer;
 
-    std::vector<u8> answer;
-    ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_US_PER_SAMPLE, answer, reserve, timeoutInMs);
+	//VECTOR_INIT_N(reserve, 2)
+	vector_init_reserve(&reserve, 2);
+	//VECTOR_INIT_N(answer, 1);
+	vector_init_reserve(&answer, 1);
+
+    memcpy(&reserve.data[0], &scanModeID, sizeof(scanModeID));
+
+    ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_US_PER_SAMPLE, &answer, &reserve, timeoutInMs);
 
     if (IS_FAIL(ans))
     {
         return ans;
     }
 
-    if (answer.size() < sizeof(u32))
+    //if (answer.size() < sizeof(u32))
+    if (answer.size < sizeof(u32))
     {
         return RESULT_INVALID_DATA;
     }
 
-    const u32 *result = (const u32 *)(&answer[0]);
+    const u32 *result = (const u32 *)(&answer.data[0]);
     *sampleDurationRes = (float)(*result >> 8);
     return ans;
 }
@@ -1234,23 +1329,32 @@ u_result get_lidar_sample_duration(float *sampleDurationRes, u16 scanModeID, u32
 u_result get_max_distance(float *maxDistance, u16 scanModeID, u32 timeoutInMs)
 {
     u_result ans;
-    std::vector<u8> reserve(2);
-    memcpy(&reserve[0], &scanModeID, sizeof(scanModeID));
+    //std::vector<u8> reserve(2);
+	vector_u8 reserve;
+    memcpy(&reserve.data[0], &scanModeID, sizeof(scanModeID));
 
-    std::vector<u8> answer;
-    ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_MAX_DISTANCE, answer, reserve, timeoutInMs);
+    //std::vector<u8> answer;
+	vector_u8 answer;
+
+	//VECTOR_INIT_N(reserve, 2)
+	vector_init_reserve(&reserve, 2);
+	//VECTOR_INIT(answer);
+	vector_init_reserve(&answer, 1);
+
+    ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_MAX_DISTANCE, &answer, &reserve, timeoutInMs);
 
     if (IS_FAIL(ans))
     {
         return ans;
     }
 
-    if (answer.size() < sizeof(u32))
+    //if (answer.size() < sizeof(u32))
+    if (answer.size < sizeof(u32))
     {
         return RESULT_INVALID_DATA;
     }
 
-    const u32 *result = (const u32 *)(&answer[0]);
+    const u32 *result = (const u32 *)(&answer.data[0]);
     *maxDistance = (float)(*result >> 8);
     return ans;
 }
@@ -1258,47 +1362,66 @@ u_result get_max_distance(float *maxDistance, u16 scanModeID, u32 timeoutInMs)
 u_result get_scan_mode_ans_type(u8 *ansType, u16 scanModeID, u32 timeoutInMs)
 {
     u_result ans;
-    std::vector<u8> reserve(2);
-    memcpy(&reserve[0], &scanModeID, sizeof(scanModeID));
+    //std::vector<u8> reserve(2);
+	vector_u8 reserve;
+    memcpy(&reserve.data[0], &scanModeID, sizeof(scanModeID));
 
-    std::vector<u8> answer;
-    ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_ANS_TYPE, answer, reserve, timeoutInMs);
+    //std::vector<u8> answer;
+	vector_u8 answer;
+
+	//VECTOR_INIT_N(reserve, 2)
+	vector_init_reserve(&reserve, 2);
+	//VECTOR_INIT(answer);
+	vector_init_reserve(&answer, 1);
+
+    ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_ANS_TYPE, &answer, &reserve, timeoutInMs);
 
     if (IS_FAIL(ans))
     {
         return ans;
     }
 
-    if (answer.size() < sizeof(u8))
+    //if (answer.size() < sizeof(u8))
+    if (answer.size < sizeof(u8))
     {
         return RESULT_INVALID_DATA;
     }
 
-    const u8 *result = (const u8 *)(&answer[0]);
+    const u8 *result = (const u8 *)(&answer.data[0]);
     *ansType = *result;
     return ans;
 }
 
 u_result get_scan_mode_name(char* modeName, u16 scanModeID, u32 timeoutInMs)
 {
+	int len;
     u_result ans;
-    std::vector<u8> reserve(2);
-    memcpy(&reserve[0], &scanModeID, sizeof(scanModeID));
+    //std::vector<u8> reserve(2);
+	vector_u8 reserve;
+    memcpy(&reserve.data[0], &scanModeID, sizeof(scanModeID));
 
-    std::vector<u8> answer;
-    ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_NAME, answer, reserve, timeoutInMs);
+    //std::vector<u8> answer;
+	vector_u8 answer;
+
+	//VECTOR_INIT_N(reserve, 2)
+	vector_init_reserve(&reserve, 2);
+	//VECTOR_INIT(answer);
+	vector_init_reserve(&answer, 1);
+
+    ans = get_lidar_conf(RPLIDAR_CONF_SCAN_MODE_NAME, &answer, &reserve, timeoutInMs);
 
     if (IS_FAIL(ans))
     {
         return ans;
     }
 
-    int len = answer.size();
+    //int len = answer.size();
+    len = answer.size;
 
     if (0 == len)
 		return RESULT_INVALID_DATA;
 
-    memcpy(modeName, &answer[0], len);
+    memcpy(modeName, &answer.data[0], len);
     return ans;
 }
 
@@ -1435,13 +1558,14 @@ u_result _cacheCapsuledScanData()
 }
 #endif
 
-u_result RPlidarDriverImplCommon::_waitUltraCapsuledNode(rplidar_response_ultra_capsule_measurement_nodes_t & node, _u32 timeout)
+//u_result _waitUltraCapsuledNode(rplidar_response_ultra_capsule_measurement_nodes_t & node, _u32 timeout)
+u_result _waitUltraCapsuledNode(rplidar_response_ultra_capsule_measurement_nodes_t *node, u32 timeout)
 {
     int  recvPos = 0;
-    _u32 startTs = getms();
-    _u8  recvBuffer[sizeof(rplidar_response_ultra_capsule_measurement_nodes_t)];
-    _u8 *nodeBuffer = (_u8*)&node;
-    _u32 waitTime;
+    u32 startTs = getms();
+    u8  recvBuffer[sizeof(rplidar_response_ultra_capsule_measurement_nodes_t)];
+    u8 *nodeBuffer = (u8*)node;
+    u32 waitTime;
 
     if (!is_connected) {
         return RESULT_OPERATION_FAIL;
@@ -1470,21 +1594,23 @@ u_result RPlidarDriverImplCommon::_waitUltraCapsuledNode(rplidar_response_ultra_
                     // pass
                     }
                     else {
-                        _is_previous_capsuledataRdy = false;
+						is_previous_capsule_data_rdy = false;
+                        //_is_previous_capsuledataRdy = false;
                         continue;
                     }
                 }
 	            break;
     	        case 1: // expect the sync bit 2
     	        {
-        	        _u8 tmp = (currentByte>>4);
+        	        u8 tmp = (currentByte>>4);
             	    if (tmp == RPLIDAR_RESP_MEASUREMENT_EXP_SYNC_2) {
                     	// pass
                 	}
                 	else
 					{
                     	recvPos = 0;
-                    	_is_previous_capsuledataRdy = false;
+						is_previous_capsule_data_rdy = false;
+                    	//_is_previous_capsuledataRdy = false;
                     	continue;
                 	}
             	}
@@ -1496,7 +1622,8 @@ u_result RPlidarDriverImplCommon::_waitUltraCapsuledNode(rplidar_response_ultra_
 			{
 				// calc the checksum ...
                 u8 checksum = 0;
-                u8 recvChecksum = ((node.s_checksum_1 & 0xF) | (node.s_checksum_2 << 4));
+                //u8 recvChecksum = ((node.s_checksum_1 & 0xF) | (node.s_checksum_2 << 4));
+                u8 recvChecksum = ((node->s_checksum_1 & 0xF) | (node->s_checksum_2 << 4));
 
                 for (size_t cpos = offsetof(rplidar_response_ultra_capsule_measurement_nodes_t, start_angle_sync_q6);
                 cpos < sizeof(rplidar_response_ultra_capsule_measurement_nodes_t); ++cpos)
@@ -1507,26 +1634,31 @@ u_result RPlidarDriverImplCommon::_waitUltraCapsuledNode(rplidar_response_ultra_
                 if (recvChecksum == checksum)
                 {
                     // only consider vaild if the checksum matches...
-                    if (node.start_angle_sync_q6 & RPLIDAR_RESP_MEASUREMENT_EXP_SYNCBIT)
+                    //if (node.start_angle_sync_q6 & RPLIDAR_RESP_MEASUREMENT_EXP_SYNCBIT)
+                    if (node->start_angle_sync_q6 & RPLIDAR_RESP_MEASUREMENT_EXP_SYNCBIT)
                     {
                         // this is the first capsule frame in logic, discard the previous cached data...
-                        _is_previous_capsuledataRdy = false;
+						is_previous_capsule_data_rdy = false;
+                        //_is_previous_capsuledataRdy = false;
                         return RESULT_OK;
                     }
                     return RESULT_OK;
                 }
-                _is_previous_capsuledataRdy = false;
+				is_previous_capsule_data_rdy = false;
+                //_is_previous_capsuledataRdy = false;
                 return RESULT_INVALID_DATA;
             }
         }
     }
-    _is_previous_capsuledataRdy = false;
+	is_previous_capsule_data_rdy = false;
+    //_is_previous_capsuledataRdy = false;
     return RESULT_OPERATION_TIMEOUT;
 }
 
-static u32 _varbitscale_decode(u32 scaled, u32 & scaleLevel)
+//static u32 _varbitscale_decode(u32 scaled, u32 & scaleLevel)
+static u32 _varbitscale_decode(u32 scaled, u32 *scaleLevel)
 {
-    static const _u32 VBS_SCALED_BASE[] = {
+    static const u32 VBS_SCALED_BASE[] = {
         RPLIDAR_VARBITSCALE_X16_DEST_VAL,
         RPLIDAR_VARBITSCALE_X8_DEST_VAL,
         RPLIDAR_VARBITSCALE_X4_DEST_VAL,
@@ -1534,7 +1666,7 @@ static u32 _varbitscale_decode(u32 scaled, u32 & scaleLevel)
         0,
     };
 
-    static const _u32 VBS_SCALED_LVL[] = {
+    static const u32 VBS_SCALED_LVL[] = {
         4,
         3,
         2,
@@ -1542,7 +1674,7 @@ static u32 _varbitscale_decode(u32 scaled, u32 & scaleLevel)
         0,
     };
 
-    static const _u32 VBS_TARGET_BASE[] = {
+    static const u32 VBS_TARGET_BASE[] = {
         (0x1 << RPLIDAR_VARBITSCALE_X16_SRC_BIT),
         (0x1 << RPLIDAR_VARBITSCALE_X8_SRC_BIT),
         (0x1 << RPLIDAR_VARBITSCALE_X4_SRC_BIT),
@@ -1555,21 +1687,25 @@ static u32 _varbitscale_decode(u32 scaled, u32 & scaleLevel)
         int remain = ((int)scaled - (int)VBS_SCALED_BASE[i]);
         if (remain >= 0) {
             scaleLevel = VBS_SCALED_LVL[i];
-            return VBS_TARGET_BASE[i] + (remain << scaleLevel);
+            return VBS_TARGET_BASE[i] + (remain << *scaleLevel);
         }
     }
     return 0;
 }
 
-void RPlidarDriverImplCommon::_ultraCapsuleToNormal(const rplidar_response_ultra_capsule_measurement_nodes_t & capsule, rplidar_response_measurement_node_hq_t *nodebuffer, size_t &nodeCount)
+//void _ultraCapsuleToNormal(const rplidar_response_ultra_capsule_measurement_nodes_t & capsule, rplidar_response_measurement_node_hq_t *nodebuffer, size_t &nodeCount)
+void _ultraCapsuleToNormal(const rplidar_response_ultra_capsule_measurement_nodes_t *capsule, rplidar_response_measurement_node_hq_t *nodebuffer, size_t *nodeCount)
 {
     nodeCount = 0;
-
-    if (_is_previous_capsuledataRdy)
+	
+    //if (_is_previous_capsuledataRdy)
+    if (is_previous_capsule_data_rdy)
 	{
         int diffAngle_q8;
-        int currentStartAngle_q8 = ((capsule.start_angle_sync_q6 & 0x7FFF) << 2);
-        int prevStartAngle_q8 = ((_cached_previous_ultracapsuledata.start_angle_sync_q6 & 0x7FFF) << 2);
+        //int currentStartAngle_q8 = ((capsule.start_angle_sync_q6 & 0x7FFF) << 2);
+        int currentStartAngle_q8 = ((capsule->start_angle_sync_q6 & 0x7FFF) << 2);
+        //int prevStartAngle_q8 = ((_cached_previous_ultracapsuledata.start_angle_sync_q6 & 0x7FFF) << 2);
+        int prevStartAngle_q8 = ((cached_previous_ultra_capsule_data.start_angle_sync_q6 & 0x7FFF) << 2);
 
         diffAngle_q8 = (currentStartAngle_q8) - (prevStartAngle_q8);
         if (prevStartAngle_q8 >  currentStartAngle_q8) {
@@ -1578,13 +1714,16 @@ void RPlidarDriverImplCommon::_ultraCapsuleToNormal(const rplidar_response_ultra
 
         int angleInc_q16 = (diffAngle_q8 << 3) / 3;
         int currentAngle_raw_q16 = (prevStartAngle_q8 << 8);
-        for (size_t pos = 0; pos < _countof(_cached_previous_ultracapsuledata.ultra_cabins); ++pos)
+
+        //for (size_t pos = 0; pos < _countof(_cached_previous_ultracapsuledata.ultra_cabins); ++pos)
+        for (size_t pos = 0; pos < _countof(cached_previous_ultra_capsule_data.ultra_cabins); ++pos)
         {
             int dist_q2[3];
             int angle_q6[3];
             int syncBit[3];
 
-            _u32 combined_x3 = _cached_previous_ultracapsuledata.ultra_cabins[pos].combined_x3;
+            //_u32 combined_x3 = _cached_previous_ultracapsuledata.ultra_cabins[pos].combined_x3;
+            u32 combined_x3 = cached_previous_ultra_capsule_data.ultra_cabins[pos].combined_x3;
 
             // unpack ...
             int dist_major = (combined_x3 & 0xFFF);
@@ -1597,15 +1736,18 @@ void RPlidarDriverImplCommon::_ultraCapsuleToNormal(const rplidar_response_ultra
 
             int dist_major2;
 
-            _u32 scalelvl1, scalelvl2;
+            u32 scalelvl1, scalelvl2;
 
 			// prefetch next ...
-            if (pos == _countof(_cached_previous_ultracapsuledata.ultra_cabins) - 1)
+            //if (pos == _countof(_cached_previous_ultracapsuledata.ultra_cabins) - 1)
+            if (pos == _countof(cached_previous_ultra_capsule_data.ultra_cabins) - 1)
             {
-                dist_major2 = (capsule.ultra_cabins[0].combined_x3 & 0xFFF);
+                //dist_major2 = (capsule.ultra_cabins[0].combined_x3 & 0xFFF);
+                dist_major2 = (capsule->ultra_cabins[0].combined_x3 & 0xFFF);
             }
             else {
-                dist_major2 = (_cached_previous_ultracapsuledata.ultra_cabins[pos + 1].combined_x3 & 0xFFF);
+                //dist_major2 = (_cached_previous_ultracapsuledata.ultra_cabins[pos + 1].combined_x3 & 0xFFF);
+                dist_major2 = (cached_previous_ultra_capsule_data.ultra_cabins[pos + 1].combined_x3 & 0xFFF);
             }
 
             // decode with the var bit scale ...
@@ -1646,12 +1788,12 @@ void RPlidarDriverImplCommon::_ultraCapsuleToNormal(const rplidar_response_ultra
                 if (dist_q2[cpos] >= (50 * 4))
                 {
                     const int k1 = 98361;
-                    const int k2 = int(k1 / dist_q2[cpos]);
+                    const int k2 = (int)(k1 / dist_q2[cpos]);
 
                     offsetAngleMean_q16 = (int)(8 * 3.1415926535 * (1 << 16) / 180) - (k2 << 6) - (k2 * k2 * k2) / 98304;
                 }
 
-                angle_q6[cpos] = ((currentAngle_raw_q16 - int(offsetAngleMean_q16 * 180 / 3.14159265)) >> 10);
+                angle_q6[cpos] = ((currentAngle_raw_q16 - (int)(offsetAngleMean_q16 * 180 / 3.14159265)) >> 10);
                 currentAngle_raw_q16 += angleInc_q16;
 
                 if (angle_q6[cpos] < 0) angle_q6[cpos] += (360 << 6);
@@ -1661,16 +1803,18 @@ void RPlidarDriverImplCommon::_ultraCapsuleToNormal(const rplidar_response_ultra
 
                 node.flag = (syncBit[cpos] | ((!syncBit[cpos]) << 1));
                 node.quality = dist_q2[cpos] ? (0x2F << RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT) : 0;
-                node.angle_z_q14 = _u16((angle_q6[cpos] << 8) / 90);
+                node.angle_z_q14 = (u16)((angle_q6[cpos] << 8) / 90);
                 node.dist_mm_q2 = dist_q2[cpos];
 
-                nodebuffer[nodeCount++] = node;
+                nodebuffer[*nodeCount++] = node;
             }
         }
     }
 
-    _cached_previous_ultracapsuledata = capsule;
-    _is_previous_capsuledataRdy = true;
+    //_cached_previous_ultracapsuledata = capsule;
+    cached_previous_ultra_capsule_data = *capsule;
+    is_previous_capsule_data_rdy = true;
+    //_is_previous_capsuledataRdy = true;
 }
 
 u_result _cacheUltraCapsuledScanData()
@@ -1683,11 +1827,11 @@ u_result _cacheUltraCapsuledScanData()
     u_result                                 ans;
     memset(local_scan, 0, sizeof(local_scan));
 
-    _waitUltraCapsuledNode(ultra_capsule_node);
+    _waitUltraCapsuledNode(&ultra_capsule_node, DEFAULT_TIMEOUT);
 
     while(is_scanning)
     {
-        if (IS_FAIL(ans=_waitUltraCapsuledNode(ultra_capsule_node))) {
+        if (IS_FAIL(ans=_waitUltraCapsuledNode(&ultra_capsule_node, DEFAULT_TIMEOUT))) {
             if (ans != RESULT_OPERATION_TIMEOUT && ans != RESULT_INVALID_DATA) {
                 is_scanning = false;
                 return RESULT_OPERATION_FAIL;
@@ -1697,7 +1841,7 @@ u_result _cacheUltraCapsuledScanData()
             }
         }
 
-        _ultraCapsuleToNormal(ultra_capsule_node, local_buf, count);
+        _ultraCapsuleToNormal(&ultra_capsule_node, local_buf, count);
 
 		for (size_t pos = 0; pos < count; ++pos)
         {
@@ -1706,11 +1850,18 @@ u_result _cacheUltraCapsuledScanData()
                 // only publish the data when it contains a full 360 degree scan 
 
                 if ((local_scan[0].flag & RPLIDAR_RESP_MEASUREMENT_SYNCBIT)) {
-                    _lock.lock();
-                    memcpy(_cached_scan_node_hq_buf, local_scan, scan_count*sizeof(rplidar_response_measurement_node_hq_t));
-                    _cached_scan_node_hq_count = scan_count;
-                    _dataEvt.set();
-                    _lock.unlock();
+                    //_lock.lock();
+					pthread_mutex_lock(&serial_mtx);
+
+                    memcpy(cached_scan_node_hq_buf, local_scan, scan_count*sizeof(rplidar_response_measurement_node_hq_t));
+                    //_cached_scan_node_hq_count = scan_count;
+                    cached_scan_node_hq_count = scan_count;
+                    //_dataEvt.set();
+					//event.set();
+					event_set(true);
+				
+                    //_lock.unlock();
+					pthread_mutex_unlock(&serial_mtx);
                 }
                 scan_count = 0;
             }
@@ -1719,9 +1870,14 @@ u_result _cacheUltraCapsuledScanData()
 
             //for interval retrieve
             {
-                rp::hal::AutoLocker l(_lock);
-                _cached_scan_node_hq_buf_for_interval_retrieve[_cached_scan_node_hq_count_for_interval_retrieve++] = local_buf[pos];
-                if(_cached_scan_node_hq_count_for_interval_retrieve == _countof(_cached_scan_node_hq_buf_for_interval_retrieve)) _cached_scan_node_hq_count_for_interval_retrieve-=1; // prevent overflow
+				// rp::hal::AutoLocker l(_lock);
+				pthread_mutex_lock(&serial_mtx);
+
+                cached_scan_node_hq_buf_for_interval_retrieve[cached_scan_node_hq_count_for_interval_retrieve++] = local_buf[pos];
+                if(cached_scan_node_hq_count_for_interval_retrieve == _countof(cached_scan_node_hq_buf_for_interval_retrieve))
+					cached_scan_node_hq_count_for_interval_retrieve-=1; // prevent overflow
+
+				pthread_mutex_unlock(&serial_mtx);
             }
         }
     }
@@ -1785,7 +1941,7 @@ static _word_size_t _thread_thunk(void *data)
 
 //template <class T, u_result (T::*PROC)(void)>
 //static Thread create_member(T * pthis)
-static thread_proc create_member(void)
+static thread_proc *create_member(void)
 {
 	//return create(_thread_thunk<T,PROC>, pthis);
 	//return create(_thread_thunk<thread_proc, _cacheUltraCapsuledScanData>, pthis);
@@ -1950,13 +2106,14 @@ u_result start_scan_express(bool force, u16 scanMode, u32 options, RplidarScanMo
     return RESULT_OK;
 }
 
-u_result check_express_scan_supported(bool & support, u32 timeout)
+//u_result check_express_scan_supported(bool & support, u32 timeout)
+u_result check_express_scan_supported(bool *support, u32 timeout)
 {
     DEPRECATED_WARN("checkExpressScanSupported(bool&, u32)", "getAllSupportedScanModes()");
 
     rplidar_response_device_info_t devinfo;
 
-    support = false;
+    *support = false;
     u_result ans = get_device_info(&devinfo, timeout);
 
     if (IS_FAIL(ans))
@@ -1964,7 +2121,7 @@ u_result check_express_scan_supported(bool & support, u32 timeout)
 
     if (devinfo.firmware_version >= ((0x1<<8) | 17))
 	{
-        support = true;
+        *support = true;
         rplidar_response_sample_rate_t sample_rate;
         get_sample_duration_us(&sample_rate, DEFAULT_TIMEOUT);
         cached_sampleduration_express = sample_rate.express_sample_duration_us;
@@ -1974,7 +2131,8 @@ u_result check_express_scan_supported(bool & support, u32 timeout)
     return RESULT_OK;
 }
 
-u_result RPlidarDriverImplCommon::startScanNormal(bool force,  _u32 timeout)
+//u_result RPlidarDriverImplCommon::startScanNormal(bool force,  _u32 timeout)
+u_result startScanNormal(bool force, u32 timeout)
 {
 	u32 header_size;
     u_result ans;
@@ -2021,7 +2179,8 @@ u_result RPlidarDriverImplCommon::startScanNormal(bool force,  _u32 timeout)
         is_scanning = true;
         //_cachethread = CLASS_THREAD(RPlidarDriverImplCommon, _cacheScanData);
 
-        if (_cachethread.getHandle() == 0)
+        //if (_cachethread.getHandle() == 0) {
+		if (_cachethread->handle == 0)
 		{
             return RESULT_OPERATION_FAIL;
         }
@@ -2048,19 +2207,19 @@ u_result start_scan(bool force, bool use_typical_scan, u32 options, RplidarScanM
         if (if_support_lidar_conf)
         {
             u16 typical_mode;  
-            ans = get_typical_scan_mode(&typical_mode);
+            ans = get_typical_scan_mode(&typical_mode, DEFAULT_TIMEOUT);
 
             if (IS_FAIL(ans))
 				return RESULT_INVALID_DATA;
     
             //call startScanExpress to do the job 
-            return start_scan_express(false, typicalMode, 0, outUsedScanMode);
+            return start_scan_express(false, typical_mode, 0, outUsedScanMode, DEFAULT_TIMEOUT);
         }
         //if old version of triangle lidar
         else
         {
             bool isExpScanSupported = false;
-            ans = check_express_scan_supported(isExpScanSupported);
+            ans = check_express_scan_supported(&isExpScanSupported, DEFAULT_TIMEOUT);
 
             if (IS_FAIL(ans))
 			{
@@ -2069,13 +2228,13 @@ u_result start_scan(bool force, bool use_typical_scan, u32 options, RplidarScanM
 
             if (isExpScanSupported)
             {
-                return start_scan_express(false, RPLIDAR_CONF_SCAN_COMMAND_EXPRESS, 0, outUsedScanMode);
+                return start_scan_express(false, RPLIDAR_CONF_SCAN_COMMAND_EXPRESS, 0, outUsedScanMode, DEFAULT_TIMEOUT);
             }
         }
     }
 
 	// 'useTypicalScan' is false, just use normal scan mode
-    if (ifSupportLidarConf)
+    if (if_support_lidar_conf)
     {
         if (outUsedScanMode)
         {
@@ -2123,39 +2282,108 @@ u_result start_scan(bool force, bool use_typical_scan, u32 options, RplidarScanM
         }
     }
 
-    return startScanNormal(force);
+    return startScanNormal(force, DEFAULT_TIMEOUT);
 }
 
-static void convert(const rplidar_response_measurement_node_hq_t& from, rplidar_response_measurement_node_t& to)
+static void convert(const rplidar_response_measurement_node_hq_t *from, rplidar_response_measurement_node_t *to)
 {
-    to.sync_quality = (from.flag & RPLIDAR_RESP_MEASUREMENT_SYNCBIT) | ((from.quality >> RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT) << RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT);
-    to.angle_q6_checkbit = 1 | (((from.angle_z_q14 * 90) >> 8) << RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT);
-    to.distance_q2 = from.dist_mm_q2 > _u16(-1) ? _u16(0) : _u16(from.dist_mm_q2);
+    to->sync_quality = (from->flag & RPLIDAR_RESP_MEASUREMENT_SYNCBIT) | ((from->quality >> RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT) << RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT);
+    to->angle_q6_checkbit = 1 | (((from->angle_z_q14 * 90) >> 8) << RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT);
+    to->distance_q2 = from->dist_mm_q2 > (u16)(-1) ? (u16)(0) : (u16)(from->dist_mm_q2);
 }
 
-u_result grab_scan_data(rplidar_response_measurement_node_t *nodebuffer, size_t & count, u32 timeout)
+//unsigned long wait( unsigned long timeout = 0xFFFFFFFF )
+unsigned long event_wait(unsigned long timeout)
+{
+	unsigned long ans = EVENT_OK;
+	//pthread_mutex_lock( &_cond_locker );
+	pthread_mutex_lock( &event.cond_locker );
+
+	//if ( !_is_signalled )
+	if ( !event.is_signalled )
+	{
+		if (timeout == 0xFFFFFFFF)
+		{
+			//pthread_cond_wait(&_cond_var,&_cond_locker);
+			pthread_cond_wait(&event.cond_var, &event.cond_locker);
+		}
+		else
+		{
+			struct timespec wait_time;
+			struct timeval now;
+			gettimeofday(&now,NULL);
+
+			wait_time.tv_sec = timeout / 1000 + now.tv_sec;
+			wait_time.tv_nsec = (timeout % 1000) * 1000000ULL + now.tv_usec * 1000;
+
+			if (wait_time.tv_nsec >= 1000000000)
+			{
+				++wait_time.tv_sec;
+				wait_time.tv_nsec -= 1000000000;
+			}
+
+			//switch (pthread_cond_timedwait(&_cond_var,&_cond_locker,&wait_time))
+			switch (pthread_cond_timedwait(&event.cond_var, &event.cond_locker, &wait_time))
+			{
+				case 0:
+					// signalled
+					break;
+				case ETIMEDOUT:
+					// time up
+					ans = EVENT_TIMEOUT;
+					goto _final;
+					break;
+				default:
+					ans = EVENT_FAILED;
+					goto _final;
+			}
+		}
+
+		//assert(_is_signalled);
+		assert(event.is_signalled);
+
+        //if (_isAutoReset)
+        if (event.is_auto_reset)
+        {
+            //_is_signalled = false;
+            event.is_signalled = false;
+        }
+
+_final:
+        //pthread_mutex_unlock( &_cond_locker );
+        pthread_mutex_unlock( &event.cond_locker );
+
+        return ans;
+	}
+}
+
+u_result grab_scan_data(rplidar_response_measurement_node_t *nodebuffer, size_t *count, u32 timeout)
 {
     DEPRECATED_WARN("grabScanData()", "grabScanDataHq()");
 
-    switch (_dataEvt.wait(timeout))
+    //switch (_dataEvt.wait(timeout))
+    switch (event_wait(timeout))
     {
 		case EVENT_TIMEOUT:
     	    count = 0;
     	    return RESULT_OPERATION_TIMEOUT;
 		case EVENT_OK:
         	{
-            	if(_cached_scan_node_hq_count == 0)
+            	//if(_cached_scan_node_hq_count == 0)
+            	if(cached_scan_node_hq_count == 0)
 					return RESULT_OPERATION_TIMEOUT; //consider as timeout
 
 				pthread_mutex_lock(&serial_mtx);
     
-            	size_t size_to_copy = min(count, _cached_scan_node_hq_count);
+            	//size_t size_to_copy = min(count, _cached_scan_node_hq_count);
+            	size_t size_to_copy = min(count, cached_scan_node_hq_count);
     
             	for (size_t i = 0; i < size_to_copy; i++)
-                	convert(_cached_scan_node_hq_buf[i], nodebuffer[i]);
+                	convert(&cached_scan_node_hq_buf[i], &nodebuffer[i]);
     
             	count = size_to_copy;
-            	_cached_scan_node_hq_count = 0;
+            	//_cached_scan_node_hq_count = 0;
+            	cached_scan_node_hq_count = 0;
 
 				pthread_mutex_unlock(&serial_mtx);
         	}
@@ -2167,23 +2395,283 @@ u_result grab_scan_data(rplidar_response_measurement_node_t *nodebuffer, size_t 
     }
 }
 
-static inline u16 get_distance_Q2(const rplidar_response_measurement_node_t& node)
+#if 0
+u_result RPlidarDriverImplCommon::grabScanDataHq(rplidar_response_measurement_node_hq_t * nodebuffer, size_t & count, _u32 timeout)
 {
+    switch (_dataEvt.wait(timeout))
+    {
+    case rp::hal::Event::EVENT_TIMEOUT:
+        count = 0;
+        return RESULT_OPERATION_TIMEOUT;
+    case rp::hal::Event::EVENT_OK:
+    {
+        if (_cached_scan_node_hq_count == 0) return RESULT_OPERATION_TIMEOUT; //consider as timeout
+
+        rp::hal::AutoLocker l(_lock);
+
+        size_t size_to_copy = min(count, _cached_scan_node_hq_count);
+        memcpy(nodebuffer, _cached_scan_node_hq_buf, size_to_copy * sizeof(rplidar_response_measurement_node_hq_t));
+
+        count = size_to_copy;
+        _cached_scan_node_hq_count = 0;
+    }
+    return RESULT_OK;
+
+    default:
+        count = 0;
+        return RESULT_OPERATION_FAIL;
+    }
+}
+#endif
+
+//static inline u16 get_distance_Q2(const rplidar_response_measurement_node_hq_t *node)
+//static inline u16 get_distance_Q2(const rplidar_response_measurement_node_t *node)
+//static inline u16 get_distance_Q2(rplidar_response_measurement_node_t *node)
+static inline u16 get_distance_Q2(const rplidar_response_measurement_node_t node)
+{
+    //return node->distance_q2;
     return node.distance_q2;
 }
 
-static inline float get_angle(const rplidar_response_measurement_node_hq_t& node)
+//static inline float get_angle(const rplidar_response_measurement_node_hq_t *node)
+static inline float get_angle(const rplidar_response_measurement_node_t node)
 {
-    return node.angle_z_q14 * 90.f / 16384.f;
+    //return node->angle_z_q14 * 90.f / 16384.f;
+    //return node.angle_z_q14 * 90.f / 16384.f;
+	return (node.angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.f;
 }
 
-static inline void set_angle(rplidar_response_measurement_node_hq_t& node, float v)
+//static inline void setAngle(rplidar_response_measurement_node_t& node, float v)
+static inline void set_angle(rplidar_response_measurement_node_t *node, float v)
 {
-    node.angle_z_q14 = _u32(v * 16384.f / 90.f);
+    u16 checkbit = node->angle_q6_checkbit & RPLIDAR_RESP_MEASUREMENT_CHECKBIT;
+    node->angle_q6_checkbit = (((u16)(v * 64.0f)) << RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) | checkbit;
 }
 
-template < class TNode >
-static u_result ascendScanData_(TNode * nodebuffer, size_t count)
+#if 0
+static inline void set_angle(rplidar_response_measurement_node_hq_t *node, float v)
+{
+    node->angle_z_q14 = (u32)(v * 16384.f / 90.f);
+}
+#endif
+
+/* Start Quick Sort */
+#if 0
+void swap(int *arr, int a, int b)
+{
+	int tmp = arr[a];
+	arr[a] = arr[b];
+	arr[b] = tmp;
+}
+
+int partition(int *arr, int left, int right)
+{
+	int pivot = arr[left];
+	int low = left + 1;
+	int high = right;
+
+	while(low <= high)
+	{
+		while(low <= right && pivot >= arr[low])
+		{
+			low++;
+		}
+		while(high >= (left + 1) && pivot <= arr[high])
+		{
+			high--;
+		}
+		if(low <= high)
+		{
+			swap(arr, low, high);
+		}
+	}
+
+	swap(arr, left, high);
+
+	return high;
+}
+
+void quick_sort(int *arr, int left, int right)
+{
+	if(left <= right)
+	{
+		int pivot = partition(arr, left, right);
+		quick_sort(arr, left, pivot - 1);
+		quick_sort(arr, pivot + 1, right);
+	}
+}
+
+/* Finish Quick Sort */
+
+// To heapify a subtree rooted with node i which is 
+// an index in arr[]. n is size of heap 
+void heapify(int arr[], int n, int i) 
+{ 
+    int largest = i; // Initialize largest as root 
+    int l = 2*i + 1; // left = 2*i + 1 
+    int r = 2*i + 2; // right = 2*i + 2 
+  
+    // If left child is larger than root 
+    if (l < n && arr[l] > arr[largest]) 
+        largest = l; 
+  
+    // If right child is larger than largest so far 
+    if (r < n && arr[r] > arr[largest]) 
+        largest = r; 
+  
+    // If largest is not root 
+    if (largest != i) 
+    { 
+        swap(arr[i], arr[largest]); 
+  
+        // Recursively heapify the affected sub-tree 
+        heapify(arr, n, largest); 
+    } 
+} 
+  
+// main function to do heap sort 
+void heapSort(int arr[], int n) 
+{ 
+    // Build heap (rearrange array) 
+    for (int i = n / 2 - 1; i >= 0; i--) 
+        heapify(arr, n, i); 
+  
+    // One by one extract an element from heap 
+    for (int i=n-1; i>0; i--) 
+    { 
+        // Move current root to end 
+        swap(arr[0], arr[i]); 
+  
+        // call max heapify on the reduced heap 
+        heapify(arr, i, 0); 
+    } 
+} 
+#endif
+/* Finish Heap Sort */
+
+void swap(int *a, int *b)
+{
+	int *tmp = a;
+	a = b;
+	b = tmp;
+}
+
+void insert_sort(rplidar_response_measurement_node_t *arr,
+				rplidar_response_measurement_node_t *start,
+				rplidar_response_measurement_node_t *end)
+{
+	int i;
+	int left = begin - arr;
+	int right = end - arr;
+
+	for (i = left + 1; i <= right; i++)
+	{
+		int key = arr[i];
+		int j = i - 1;
+
+		while (j >= left && arr[j] > key)
+		{
+			arr[j + 1] = arr[j];
+			j = j - 1;
+		}
+
+		arr[j + 1] = key;
+	}
+
+	return;
+}
+
+int *partition(int *arr, int low, int high)
+{
+	int pivot = arr[high];
+	int j, i = (low - 1);
+
+	for (j = low; j <= high - 1; j++)
+	{
+		if (arr[j] <= pivot)
+		{
+			i++;
+			swap(arr[i], arr[j]);
+		}
+	}
+
+	swap(arr[i + 1], arr[high]);
+
+	return arr + 1 + i;
+}
+
+int *median_of_three(int *a int *b, int *c)
+{
+	if (*a < *b && *b < *c) 
+        return (b); 
+  
+    if (*a < *c && *c <= *b) 
+        return (c); 
+  
+    if (*b <= *a && *a < *c) 
+        return (a); 
+  
+    if (*b < *c && *c <= *a) 
+        return (c); 
+  
+    if (*c <= *a && *a < *b) 
+        return (a); 
+  
+    if (*c <= *b && *b <= *c) 
+        return (b); 
+}
+
+// count = 2 * log(start - end);
+void hybrid_sort(rplidar_response_measurement_node_t *arr, rplidar_response_measurement_node_t *start,
+				rplidar_response_measurement_node_t *end, size_t count)
+{
+	int *pivot;
+	int size = end - begin;
+
+	if (size < 16)
+	{
+		insert_sort(arr, start, end);
+		return;
+	}
+
+	if (count == 0)
+	{
+		make_heap(start, end + 1);
+		sort_heap(start, end + 1);
+		return;
+	}
+
+	pivot = median_of_three(start, start + size / 2, end);
+
+	swap(pivot, end);
+
+	partition_point = partition(arr, start - arr, end - arr);
+	hybrid_sort(arr, start, partition_point - 1, count - 1);
+	hybrid_sort(arr, partition_point + 1, end, count - 1);
+
+	return;
+}
+
+static bool angle_less_than(rplidar_response_measurement_node_t a, rplidar_response_measurement_node_t b)
+{
+	return get_angle(a) < get_angle(b);
+}
+
+//template <class TNode>
+//static bool angleLessThan(const TNode& a, const TNode& b)
+//{
+//    return getAngle(a) < getAngle(b);
+//}
+
+//static u_result ascend_scan_data_(rplidar_response_measurement_node_t *nodebuffer, size_t count)
+//quick_sort(nodebuffer, nodebuffer + count, &angleLessThan<TNode>);
+
+//template < class TNode >
+//static u_result ascendScanData_(TNode *nodebuffer, size_t count)
+//template rplidar_response_measurement_node_hq_t
+//static u_result ascend_scan_data_(TNode *nodebuffer, size_t count)
+//static u_result ascend_scan_data_(rplidar_response_measurement_node_hq_t *nodebuffer, size_t count)
+static u_result ascend_scan_data_(rplidar_response_measurement_node_t *nodebuffer, size_t count)
 {
     float inc_origin_angle = 360.f/count;
     size_t i = 0;
@@ -2199,13 +2687,14 @@ static u_result ascendScanData_(TNode * nodebuffer, size_t count)
 		{
             while(i != 0)
 			{
-                i--;
+                //float expect_angle = get_angle(nodebuffer[i+1]) - inc_origin_angle;
                 float expect_angle = get_angle(nodebuffer[i+1]) - inc_origin_angle;
+                i--;
 
                 if (expect_angle < 0.0f)
 					expect_angle = 0.0f;
 
-                set_angle(nodebuffer[i], expect_angle);
+                set_angle(&nodebuffer[i], expect_angle);
             }
             break;
         }
@@ -2232,7 +2721,7 @@ static u_result ascendScanData_(TNode * nodebuffer, size_t count)
                 if (expect_angle > 360.0f)
 					expect_angle -= 360.0f;
 
-                set_angle(nodebuffer[i], expect_angle);
+                set_angle(&nodebuffer[i], expect_angle);
             }
             break;
         }
@@ -2249,19 +2738,22 @@ static u_result ascendScanData_(TNode * nodebuffer, size_t count)
             if (expect_angle > 360.0f)
 				expect_angle -= 360.0f;
 
-            set_angle(nodebuffer[i], expect_angle);
+            set_angle(&nodebuffer[i], expect_angle);
         }
     }
 
     // Reorder the scan according to the angle value
-    std::sort(nodebuffer, nodebuffer + count, &angleLessThan<TNode>);
+    //std::sort(nodebuffer, nodebuffer + count, &angleLessThan<TNode>);
+    quick_sort(nodebuffer, nodebuffer + count, &angleLessThan<TNode>);
 
     return RESULT_OK;
 }
 
-u_result ascend_scan_data(rplidar_response_measurement_node_hq_t *nodebuffer, size_t count)
+//u_result ascend_scan_data(rplidar_response_measurement_node_hq_t *nodebuffer, size_t count)
+u_result ascend_scan_data(rplidar_response_measurement_node_t *nodebuffer, size_t count)
 {
-    return ascend_scan_data_<rplidar_response_measurement_node_hq_t>(nodebuffer, count);
+    //return ascend_scan_data_<rplidar_response_measurement_node_hq_t>(nodebuffer, count);
+    return ascend_scan_data_(nodebuffer, count);
 }
 
 void ctrlc(int)
@@ -2325,6 +2817,9 @@ int main(void)
 
 	while (1)
 	{
+		// TODO
+		// deprecated - rplidar_response_measurement_node_hq_t
+        //rplidar_response_measurement_node_t nodes[8192];
         rplidar_response_measurement_node_t nodes[8192];
         size_t   count = _countof(nodes);
 
@@ -2332,6 +2827,7 @@ int main(void)
 
         if (IS_OK(op_result))
 		{
+			// rplidar_response_measurement_node_t
             ascend_scan_data(nodes, count);
             for (int pos = 0; pos < (int)count; ++pos)
 			{
