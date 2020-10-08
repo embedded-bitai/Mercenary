@@ -10,13 +10,16 @@ OBJS = $(SRCS:%.c=%.o)
 LIB_DIR = $(PWD)/../lib
 LIB_OBJS = $(shell find $(LIB_DIR) -name '*.o')
 
-TARGET = custom_vector_test
+TARGET = custom_vector_test heap_sort_test
 
 all: $(OBJS)
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 custom_vector_test: custom_vector_test.o
+	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
+
+heap_sort_test: heap_sort_test.o
 	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
 
 .c.o:
