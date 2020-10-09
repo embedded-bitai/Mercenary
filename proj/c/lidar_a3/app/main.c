@@ -2622,7 +2622,7 @@ int *median_of_three(int *a int *b, int *c)
 }
 
 // count = 2 * log(start - end);
-void hybrid_sort(rplidar_response_measurement_node_t *arr, rplidar_response_measurement_node_t *start,
+void hybrid_sort_util(rplidar_response_measurement_node_t *arr, rplidar_response_measurement_node_t *start,
 				rplidar_response_measurement_node_t *end, size_t count)
 {
 	int *pivot;
@@ -2646,8 +2646,8 @@ void hybrid_sort(rplidar_response_measurement_node_t *arr, rplidar_response_meas
 	swap(pivot, end);
 
 	partition_point = partition(arr, start - arr, end - arr);
-	hybrid_sort(arr, start, partition_point - 1, count - 1);
-	hybrid_sort(arr, partition_point + 1, end, count - 1);
+	hybrid_sort_util(arr, start, partition_point - 1, count - 1);
+	hybrid_sort_util(arr, partition_point + 1, end, count - 1);
 
 	return;
 }
