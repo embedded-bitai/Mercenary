@@ -1,5 +1,7 @@
 package com.example.lidar_demo.controller;
 
+import com.example.lidar_demo.nativeinterface.array.ArrayReturnTest;
+import com.example.lidar_demo.nativeinterface.array.User;
 import com.example.lidar_demo.nativeinterface.lidar.LidarSpring;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,8 +31,21 @@ public class LidarController {
         String formattedDate = dateFormat.format(date);
         model.addAttribute("servTime", formattedDate);
 
-
-
         return "index";
+    }
+
+    @GetMapping("/arraytest")
+    public String index() {
+        log.info("arraytest");
+
+        User user = new User();
+        user.setSerial(10L);
+        user.setName("test");
+        user.setAge(20);
+
+        int res = ArrayReturnTest.add(user);
+        log.info("res = " + res);
+
+        return "test";
     }
 }

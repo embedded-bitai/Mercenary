@@ -50,6 +50,7 @@ void make_lidar_task(void)
 JNIEXPORT jstring JNICALL
 Java_com_example_lidar_demo_nativeinterface_lidar_LidarSpring_print(JNIEnv *env, jobject obj)
 {
+
 }
 
 JNIEXPORT void JNICALL
