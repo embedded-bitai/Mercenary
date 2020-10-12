@@ -1,3 +1,5 @@
 javah -jni com.example.lidar_demo.nativeinterface.test.HelloSpring
 
 We need to do it at Spring java dir
+
+-Xms128m -Xmx991m -XX:ReservedCodeCacheSize=240m -XX:+UseConcMarkSweepGC -XX:SoftRefLRUPolicyMSPerMB=50

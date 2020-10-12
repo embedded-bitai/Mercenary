@@ -34,18 +34,18 @@ JNIEXPORT jint JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayR
 /*
  * Class:     com_example_lidar_demo_nativeinterface_array_ArrayReturnTest
  * Method:    readyToGetStruct
- * Signature: ([J[JI)V
+ * Signature: ([J[J[J[JI)V
  */
 JNIEXPORT void JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_readyToGetStruct
-  (JNIEnv *, jclass, jlongArray, jlongArray, jint);
+  (JNIEnv *, jclass, jlongArray, jlongArray, jlongArray, jlongArray, jint);
 
 /*
  * Class:     com_example_lidar_demo_nativeinterface_array_ArrayReturnTest
  * Method:    getStruct
- * Signature: ([J[J)V
+ * Signature: ([J[J[J[J)V
  */
 JNIEXPORT void JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_getStruct
-  (JNIEnv *, jclass, jlongArray, jlongArray);
+  (JNIEnv *, jclass, jlongArray, jlongArray, jlongArray, jlongArray);
 
 /*
  * Class:     com_example_lidar_demo_nativeinterface_array_ArrayReturnTest
@@ -54,6 +54,14 @@ JNIEXPORT void JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayR
  */
 JNIEXPORT jobjectArray JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_testStruct
   (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     com_example_lidar_demo_nativeinterface_array_ArrayReturnTest
+ * Method:    readyToGetIntArray
+ * Signature: ([I[II)V
+ */
+JNIEXPORT void JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_readyToGetIntArray
+  (JNIEnv *, jclass, jintArray, jintArray, jint);
 
 #ifdef __cplusplus
 }

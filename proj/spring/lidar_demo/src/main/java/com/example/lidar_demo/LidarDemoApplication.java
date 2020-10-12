@@ -11,8 +11,8 @@ public class LidarDemoApplication {
     final static Logger log = LoggerFactory.getLogger(LidarDemoApplication.class);
 
     public static void main(String[] args) {
-        HelloSpring hs = new HelloSpring();
-        log.info(hs.print());
+        //HelloSpring hs = new HelloSpring();
+        //log.info(hs.print());
 
         SpringApplication.run(LidarDemoApplication.class, args);
 
