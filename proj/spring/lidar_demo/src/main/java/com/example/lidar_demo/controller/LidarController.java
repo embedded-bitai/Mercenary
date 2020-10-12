@@ -34,6 +34,7 @@ public class LidarController {
         return "index";
     }
 
+    /*
     @GetMapping("/arraytest")
     public String index() {
         log.info("arraytest");
@@ -48,4 +49,5 @@ public class LidarController {
 
         return "test";
     }
+     */
 }

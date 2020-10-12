@@ -15,6 +15,7 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'application'
 apply plugin: 'c'
+apply plugin: 'cpp'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
 
@@ -58,6 +59,10 @@ test {
             file("${buildDir}/libs/hello/shared").absolutePath)
     systemProperty("java.library.path",
             file("${buildDir}/libs/uartspring/shared").absolutePath)
+    systemProperty("java.library.path",
+            file("${buildDir}/libs/lidarspring/shared").absolutePath)
+    systemProperty("java.library.path",
+            file("${buildDir}/libs/arrayreturntest/shared").absolutePath)
 }
 
 model {
@@ -113,14 +118,14 @@ model {
         arrayreturntest(NativeLibrarySpec) {
             binaries.all {
                 if (targetPlatform.operatingSystem.macOsX) {
-                    cCompiler.args '-I', "${org.gradle.internal.jvm.Jvm.current().javaHome}/include"
-                    cCompiler.args '-I', "${org.gradle.internal.jvm.Jvm.current().javaHome}/include/darwin"
-                    cCompiler.args '-mmacosx-version-min=10.4'
+                    cppCompiler.args '-I', "${org.gradle.internal.jvm.Jvm.current().javaHome}/include"
+                    cppCompiler.args '-I', "${org.gradle.internal.jvm.Jvm.current().javaHome}/include/darwin"
+                    cppCompiler.args '-mmacosx-version-min=10.4'
                     linker.args '-mmacosx-version-min=10.'
                 } else if (targetPlatform.operatingSystem.linux) {
-                    cCompiler.args '-I', "${org.gradle.internal.jvm.Jvm.current().javaHome}/include"
-                    cCompiler.args '-I', "${org.gradle.internal.jvm.Jvm.current().javaHome}/include/linux"
-                    cCompiler.args '-D_FILE_OFFSET_BITS=64 -lpthread'
+                    cppCompiler.args '-I', "${org.gradle.internal.jvm.Jvm.current().javaHome}/include"
+                    cppCompiler.args '-I', "${org.gradle.internal.jvm.Jvm.current().javaHome}/include/linux"
+                    cppCompiler.args '-D_FILE_OFFSET_BITS=64 -lpthread -lm'
                 }
             }
         }

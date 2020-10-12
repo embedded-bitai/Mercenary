@@ -5,7 +5,7 @@ public class LidarSpring {
     native public void lidar_start();
     native public void lidar_stop();
 
-    static {
-        System.loadLibrary("lidarspring");
-    }
+    //static {
+    //    System.loadLibrary("lidarspring");
+    //}
 }

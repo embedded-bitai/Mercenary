@@ -1,0 +1,3 @@
+javah -jni com.example.lidar_demo.nativeinterface.test.HelloSpring
+
+We need to do it at Spring java dir
