@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Python Result</title>
+</head>
+<body>
+    <h1>Python Result</h1>
+    <h3 th:text="${msg}">Result</h3>
+    <table>
+        <tr th:each="val : ${msg}">
+            <td th:text="${val}"></td>
+        </tr>
+    </table>
+</body>
+</html>

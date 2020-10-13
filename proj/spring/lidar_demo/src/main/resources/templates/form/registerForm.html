@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <h1>RegisterForm</h1>
+
+    <form th:action="@{/regtest}" method="post">
+        userId: <input type="text"
+                       name="userId"
+                       value="sdr4linux">
+        passwd: <input type="text"
+                       name="passwd"
+                       value="1234">
+        <input type="submit" value="Register Test">
+    </form>
+    <a th:href="@{/getRegTest?userId=sdr4linux&date=2020/07/24}">
+        <input type="submit" value="Register Test">
+    </a>
+</body>
+</html>

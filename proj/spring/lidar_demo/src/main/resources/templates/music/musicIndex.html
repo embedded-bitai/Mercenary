@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <h1>Music Page</h1>
+    <form th:action="@{/musics/play}">
+        <input type="submit" value="음악 재생">
+    </form>
+    <form th:action="@{/musics/menu}">
+        <input type="submit" value="메뉴 보기">
+    </form>
+    <form th:action="@{/musics/record}">
+        <input type="submit" value="음성 녹음">
+    </form>
+    <form th:action="@{/musics/test}">
+        <input type="submit" value="테스트">
+    </form>
+    <form th:action="@{/musics/titles}">
+        <input type="submit" value="리스트 보기">
+    </form>
+    <form th:action="@{/musics/artists}">
+        <input type="submit" value="해쉬맵 보기">
+    </form>
+    <form th:action="@{/musics/resptest}">
+        <input type="submit" value="Void 응답 확인하기">
+    </form>
+    <form th:action="@{/musics/respstring}">
+        <input type="submit" value="String 응답 확인하기">
+    </form>
+    <form th:action="@{/musics/respclass}">
+        <input type="submit" value="Class 응답 확인하기">
+    </form>
+    <form th:action="@{/musics/resplist}">
+        <input type="submit" value="List 응답 확인하기">
+    </form>
+    <form th:action="@{/musics/respfile}">
+        <input type="submit" value="File 응답 확인하기">
+    </form>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<script type="text/javascript"
+        src="http://code.jquery.com/jquery-2.1.4.min.js">
+</script>
+<script>
+    $(document).ready(function() {
+        var formObj = $("#board");
+
+        $("#btnRegister").on("click", function() {
+            formObj.attr("action", "postRegister");
+            formObj.attr("method", "post");
+            formObj.submit();
+        });
+
+        $("#btnList").on("click", function() {
+            self.location = "list";
+        });
+    });
+</script>
+<body>
+    <h2>Register</h2>
+
+    <!-- th:action="@" URL 링킹
+         th:object="$" 객체 링킹
+         th:field="*" 객체에 있는 내부 멤버 링킹 -->
+
+    <form id="board" action="board/success.html"
+          th:action="@{register}"
+          th:object="${board}" method="post">
+        <table>
+            <tr>
+                <td>Title</td>
+                <td><input type="text" name="title"
+                           th:field="*{title}"/></td>
+                <td><font color="red">
+                    <!-- 앞서 얻은 field에 title에 에러가 있다면 -->
+                    <span th:if="${#fields.hasErrors('title')}"
+                          th:errors="*{title}">
+                        title Error Message
+                    </span>
+                </font></td>
+            </tr>
+            <tr>
+                <td>Writer</td>
+                <td><input type="text" name="writer"
+                           th:field="*{writer}"/></td>
+                <td><font color="red">
+                    <span th:if="${#fields.hasErrors('writer')}"
+                          th:errors="*{writer}">
+                        writer Error Message
+                    </span>
+                </font></td>
+            </tr>
+            <tr>
+                <td>Content</td>
+                <td><textarea name="content"
+                              th:field="*{content}"></textarea></td>
+                <td><font color="red">
+                    <span th:if="${#fields.hasErrors('content')}"
+                          th:errors="*{content}">
+                        content Error Message
+                    </span>
+                </font></td>
+            </tr>
+        </table>
+    </form>
+
+    <div>
+        <button type="submit" id="btnRegister">Register</button>
+        <button type="submit" id="btnList">List</button>
+    </div>
+</body>
+</html>

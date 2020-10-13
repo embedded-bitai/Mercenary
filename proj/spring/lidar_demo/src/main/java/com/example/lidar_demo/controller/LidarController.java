@@ -16,11 +16,13 @@ import java.util.Locale;
 @Controller
 public class LidarController {
     static final Logger log = LoggerFactory.getLogger(LidarController.class);
-    LidarSpring ls = new LidarSpring();
 
-    @GetMapping("/lidar")
-    public String index(Locale locale, Model model) {
-        log.info("index()");
+    float[] dist = new float[1421];
+    float[] angle = new float[1421];
+
+    @GetMapping("/startlidar")
+    public String startlidar(Locale locale, Model model) throws InterruptedException {
+        log.info("startlidar()");
 
         /*
         Date date = new Date();
@@ -33,23 +35,29 @@ public class LidarController {
         model.addAttribute("servTime", formattedDate);
          */
 
-        return "index";
+        LidarSpring.lidar_start();
+
+        return "lidar";
     }
 
-    /*
-    @GetMapping("/arraytest")
-    public String index() {
-        log.info("arraytest");
+    @GetMapping("/getlidar")
+    public String getlidar(Locale locale, Model model) throws InterruptedException {
+        log.info("getlidar()");
 
-        User user = new User();
-        user.setSerial(10L);
-        user.setName("test");
-        user.setAge(20);
+        LidarSpring.print(dist, angle);
 
-        int res = ArrayReturnTest.add(user);
-        log.info("res = " + res);
+        for(int i = 0; i < 1421; i++)
+        {
+            log.info("dist = " + dist[i] + ", angle = " + angle[i]);
+        }
 
-        return "test";
+        return "lidar";
     }
-     */
+
+    @GetMapping("/stoplidar")
+    public void stoplidar(Locale locale, Model model) throws InterruptedException {
+        log.info("stoplidar()");
+
+        LidarSpring.lidar_stop();
+    }
 }

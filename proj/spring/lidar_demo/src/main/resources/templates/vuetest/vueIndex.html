@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:v-on="http://www.w3.org/1999/xhtml" xmlns:v-bind="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Vue Index Page</title>
+    <link href="css/vueMain.css" rel="stylesheet">
+</head>
+<body>
+<h2>Vue Index Page</h2>
+<div id="app">
+    <h3>{{ message }}</h3>
+    <!-- Vue 객체에 있는 message의 길이를 산출 -->
+    <p>{{ message.length }}</p>
+    <p>{{ list[2] }}</p>
+    <p>{{ list[num] }}</p>
+    <ol>
+        <!-- Vue 객체가 가지고 있는 list에서 정보를 뽑아와서
+            item에 설정하고 각각의 item들을 출력한다. -->
+        <li v-for="item in list">{{ item }}</li>
+    </ol>
+    <button v-on:click="handleClick">Click</button>
+    <input v-model="initMsg"><br><br>
+    <!-- 1. 캐릭터 이름, 레벨, 상태, HP, ATK, DEF 표시 -->
+    캐릭터명: <input v-model="characterName"><br>
+    레벨: <input v-model="characterLv"><br>
+    상태: <input v-model="characterStatus"><br>
+    HP: <input v-model="characterHp"><br>
+    ATK: <input v-model="characterAtk"><br>
+    DEF: <input v-model="characterDef"><br>
+
+    <p>{{ initMsg }}</p>
+    <button v-on:click="show=!show">Change</button>
+    <transition>
+        <p v-if="show">Show Time!</p>
+    </transition>
+    <p>{{ count }}번 클릭했다!</p>
+    <button v-on:click="increment">Count</button>
+    <button v-on:click="isActive=!isActive">
+        Change Mode
+    </button>
+    <p v-bind:class="{ child: isChild, 'is-active': isActive }"
+       class="item">
+        Dynamic Class
+    </p>
+    <p v-bind:style="{ color: textColor, backgroundColor: bgColor }"
+       class="item">
+        Dynamic Style
+    </p>
+    <svg xmlns="http://www.w3.org/2000/svg" version="1.1">
+        <circle v-bind:r="radius" fill="lightblue" cx="50" cy="10"/>
+    </svg>
+    <input type="range" min="0" max="100" v-model="radius">
+    <br>
+
+    <p>캐릭터명: {{ characterName }}&nbsp;&nbsp;&nbsp;경험치: {{ curExp }}/{{ needExp}}</p>
+    <p>레벨: {{ characterLv }}</p>
+    <p>상태: {{ characterStatus }}</p>
+    <p>HP: {{ characterHp }}</p>
+    <p>ATK: {{ characterAtk }}</p>
+    <p>DEF: {{ characterDef }}</p>
+    <p>Money: {{ money }}</p>
+
+    <!--
+    이름
+    <input v-model="monsterName">
+    -->
+    <!-- Vue는 객체의 변화를 감지하면 HTML을 다시 렌더링한다. -->
+    <button v-on:click="addMonster">Add Monster</button>
+    <button v-on:click="addManyMonster">Add Many Monster</button>
+    <button v-on:click="ThorHammer">Thor's Hammer</button>
+    <ul>
+        <li v-for="(item, index) in monster"
+            v-bind:key="item.id" v-if="item.hp">
+            ID:{{ item.id }} {{ item.monsterName }} HP:{{ item.hp }} Status:{{ item.status }}
+            <span v-if="item.hp > 300">Strong</span>
+            <span v-if="item.hp < 50">Morbidity</span>
+            <!--
+            <button v-on:click="doRemove(index)">
+                Delete Monster
+            </button>
+            -->
+            <button v-on:click="doAttack(index)">
+                Attack
+            </button>
+            <button v-on:click="omnislash(index)">
+                Omnislash
+            </button>
+        </li>
+        <!-- 몬스터의 hp가 0임을 확인하면
+             경험치 산정을 수행하도록 한다.
+             hp가 0임을 확인하고 경험치 산정후 delete! -->
+        <li v-for="(item, index) in monBook"
+            v-bind:key="item.monsterName">
+            {{ item.monsterName }} HP: {{ item.hp }} Exp: {{ item.exp }}
+        </li>
+    </ul>
+    <br><button v-on:click="genRandom()">
+    Generate Random
+</button>
+    <p>{{ randomTest }}</p><br>
+    <label>
+        <input type="checkbox" v-model="boolTest"> {{ boolTest }}
+    </label>
+    <label>
+        <input type="checkbox" v-model="arrValue" value="X"> X
+    </label>
+    <label>
+        <input type="checkbox" v-model="arrValue" value="Y"> Y
+    </label>
+    <label>
+        <input type="checkbox" v-model="arrValue" value="Z"> Z
+    </label>
+    <p>{{ arrValue }}</p>
+    <label>
+        <input type="radio" v-model="radValue" value="A"> A
+    </label>
+    <label>
+        <input type="radio" v-model="radValue" value="B"> B
+    </label>
+    <label>
+        <input type="radio" v-model="radValue" value="C"> C
+    </label>
+    <p>{{ radValue }}</p>
+    <select v-model="optValue">
+        <option disabled="disabled">Select!</option>
+        <option value="I">I</option>
+        <option value="J">J</option>
+        <option value="K">K</option>
+    </select>
+    <p>{{ optValue }}</p>
+    <select v-model="optArrValue" multiple>
+        <option value="I">I</option>
+        <option value="J">J</option>
+        <option value="K">K</option>
+    </select>
+    <p>{{ optArrValue }}</p>
+    <p>{{ itemBook[0].itemName }}</p>
+    <p>{{ itemBook[0].price }}</p>
+    <p>{{ itemBook[0].effect.desc }}</p>
+    <p>{{ itemBook[0].effect.amount }}</p>
+    <!-- 상점 기능 구현에서 제일 중요한 것들을 추려보자!
+         1. 게임내에 소지금에 대한 정보가 필요하다.
+         2. 몹을 잡을때마다 일정 부분 획득할 수 있게 만들어줘야 한다.
+         3. 내 인벤토리 보기가 가능해야한다.
+         4. 상점에서 판매하는 품목 리스트가 보여야한다.
+         5. 구매에 대한 계산
+         6. 판매에 대한 계산 -->
+    <h3>상점</h3>
+    <label>
+        <input type="checkbox" v-model="myInven" v-on:click="test()">My Inventory
+    </label>
+    <transition>
+        <p v-if="myInven">내 인벤토리 리스트들을 보여줘야 한다.</p>
+    </transition>
+    <label>
+        <input type="checkbox" v-model="shopView" v-on:click="shuffleShopList()">Shop List
+    </label>
+    <table border="1">
+        <tr v-if="shopView">
+            <th align="center" width="20">No</th>
+            <th align="center" width="80">Name</th>
+            <th align="center" width="80">Price</th>
+            <th align="center" width="320">Effect</th>
+            <th align="center" width="40">Buy</th>
+        </tr>
+        <tr v-if="shopView" v-for="(list, idx) in shopList"
+            v-bind:key="list.itemName">
+            <th align="center" width="20">{{ idx + 1 }}</th>
+            <th align="center" width="80">{{ list.itemName }}</th>
+            <th align="center" width="80">{{ list.price }}</th>
+            <th align="center" width="320">{{ list.effect.desc }}</th>
+            <th align="center" width="40">
+                <label>
+                    <input type="checkbox"
+                           v-model="listValue"
+                           v-bind:value="idx">
+                </label>
+            </th>
+        </tr>
+    </table>
+    <p>{{ listValue }}</p>
+</div>
+<script src="https://unpkg.com/vuex@2.0.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.10">
+</script>
+<script>
+        // 새로운 Vue 객체를 생성한다.
+        // HTML, CSS도 재활용성을 극대화시키자!
+        var app = new Vue({
+            // id가 app임을 나타낸다.
+            el: '#app',
+            // 그리고 Vue 객체가 가지고 있는 데이터
+            data: {
+                // 변수(message): 내용
+                message: 'Hello Vue.js',
+                initMsg: 'Initial Message',
+                list: ['apple', 'banana', 'cherry'],
+                show: true,
+                num: 1,
+                count: 0,
+                isChild: true,
+                isActive: true,
+                textColor: 'red',
+                bgColor: 'lightgray',
+                radius: 50,
+                monster: [
+                    { id: 1, monsterName: 'Slime', hp: 10, status: 'Default' },
+                    { id: 2, monsterName: 'Goblin', hp: 20, status: 'Default' },
+                    { id: 3, monsterName: 'Dragon', hp: 5000, status: 'Default' }
+                ],
+                monBook: [
+                    { monsterName: 'Slime', exp: 1, hp: 10, sprMoney: 10 },
+                    { monsterName: 'Goblin', exp: 2, hp: 20, sprMoney: 20 },
+                    { monsterName: 'Red Slime', exp: 5, hp: 10, sprMoney: 40 },
+                    { monsterName: 'Chimera', exp: 20, hp: 100, sprMoney: 200 },
+                    { monsterName: 'King Bee', exp: 300, hp: 1200, sprMoney: 2400 },
+                    { monsterName: 'Ghost', exp: 500, hp: 1500, sprMoney: 3000 },
+                    { monsterName: 'Lich', exp: 1000, hp: 2000, sprMoney: 4000 },
+                    { monsterName: 'Behemoth', exp: 2000, hp: 10000, sprMoney: 20000 },
+                    { monsterName: 'Dragon', exp: 100000, hp: 100000, sprMoney: 200000 },
+                    { monsterName: 'King Behemoth', exp: 200000, hp: 200000, sprMoney: 500000 }
+                ],
+                itemBook: [
+                    { itemName: 'HP Potion I', price: 50, effect: { desc: "hp recover", amount: 200 } },
+                    { itemName: 'HP Potion II', price: 200, effect: { desc: "hp recover", amount: 500 } },
+                    { itemName: 'HP Potion III', price: 1000, effect: { desc: "hp recover", amount: 2000 } },
+                    { itemName: 'HP Potion IV', price: 6000, effect: { desc: "hp recover", amount: 6000 } },
+                    { itemName: 'HP Potion V', price: 42000, effect: { desc: "hp recover", amount: 15000 } },
+                    { itemName: 'Sword', price: 1000000, effect: { desc: "weapon", atk: 100 } },
+                    { itemName: 'Iron Sword', price: 20000000, effect: { desc: "weapon", atk: 200 } }
+                ],
+                shopList: [],
+                monsterName: 'Chimera',
+                characterName: '',
+                characterLv: 1,
+                characterStatus: '',
+                characterHp: 100,
+                characterAtk: 10,
+                characterDef: 1,
+                onlyCalcDef: 0,
+                curExp: 0,
+                needExp: 10,
+                randomTest: 0,
+                boolTest: true,
+                arrValue: [],
+                radValue: '',
+                optValue: '',
+                optArrValue: [],
+                money: 500,
+                shopView: false,
+                myInven: false,
+                listValue: []
+            },
+            methods: {
+                handleClick: function(event) {
+                    alert(event.target)
+                },
+                increment: function() {
+                    this.count += 1
+                },
+                addMonster: function() {
+                    // 몬스터(monster) 배열에서 최대값을 찾기 위한 작업
+                    // reduce를 통해 각각의 원소에 있는 모든 값들을 검사함
+                    // 최종적으로 id값중 최대값을 획득하게 된다.
+                    var max = this.monster.reduce(function(a, b) {
+                        return a > b.id ? a : b.id
+                    }, 0)
+                    var lenMax = this.monBook.length
+                    var idx = Math.floor(Math.random() * lenMax)
+                    // push를 통해서 monster 배열에 새로운 내용을 추가한다.
+                    // 몬스터 추가가 너무 단조로우므로
+                    // 추가를 누르면 랜덤하게 몬스터들이 배치되게 만든다.
+                    this.monster.push({
+                        id: max + 1,
+                        monsterName: this.monBook[idx].monsterName,
+                        hp: this.monBook[idx].hp,
+                        status: 'Default'
+                    })
+                },
+                addManyMonster: function() {
+                    // 한 번에 100마리씩 몬스터를 추가한다.
+                    for(var i = 0; i < 100; i ++) {
+                        var max = this.monster.reduce(function(a, b) {
+                            return a > b.id ? a : b.id
+                        }, 0)
+                        var lenMax = this.monBook.length
+                        var idx = Math.floor(Math.random() * lenMax)
+                        this.monster.push({
+                            id: max + 1,
+                            monsterName: this.monBook[idx].monsterName,
+                            hp: this.monBook[idx].hp,
+                            status: 'Default'
+                        })
+                    }
+                },
+                doRemove: function(index) {
+                    this.monster.splice(index, 1)
+                },
+                doAttack: function(index) {
+                    this.monster[index].hp -= this.characterAtk
+                },
+                genRandom: function() {
+                    this.randomTest = Math.floor(
+                        Math.random() * this.monBook.length
+                    )
+                },
+                ThorHammer: function() {
+                    var i
+                    // 모든 몬스터들에게
+                    for(i = 0; i < this.monster.length; i++) {
+                        this.monster[i].hp = parseInt(this.monster[i].hp - this.characterAtk * 1.5)
+                        if(this.monster[i].hp > 0) {
+                            this.monster[i].status = 'Stun'
+                        }
+                    }
+                },
+                omnislash: function(index) {
+                    // alert('겁나 아픈거')
+                    this.monster[index].hp = parseInt(this.monster[index].hp - this.characterAtk * 20)
+                },
+                test: function() {
+                    alert('check')
+                },
+                shuffleShopList: function() {
+                    if(!this.shopView) {
+                        this.listValue = []
+                    }
+
+                    // 상점에 새로운 아이템을 갱신하도록 만드는 위치
+                    for(var i = 0; i < 10; i++) {
+                        var randIdx = Math.floor(Math.random() * this.itemBook.length)
+                        this.shopList[i] = this.itemBook[randIdx]
+
+                        console.log(this.listValue[i])
+                    }
+                }
+            },
+            beforeCreate: function () {
+                // alert('Before Create: ' + this.monster)
+            },
+            created: function () {
+                // alert('Created: ' + this.monster)
+            },
+            beforeMount: function () {
+                // alert('Before Mount: ' + this.monster)
+            },
+            mounted: function () {
+                // alert('Mounted: ' + this.monster)
+            },
+            // Vue 객체에 변화가 발생했을때 다시 렌더링(그림 그리기)
+            // 동기 처리를 보장한다.
+            // 만약 네트워킹 환경이라면 ? (세마포어 vs 스핀락)
+            beforeUpdate: function () {
+                // alert('Before Update: ' + this.monster)
+
+                var i
+                for(i = 0; i < this.monster.length; i++) {
+                    if(this.monster[i].hp <= 0) {
+                        for(var j = 0; j < this.monBook.length; j++) {
+                            if(this.monster[i].monsterName
+                              == this.monBook[j].monsterName) {
+                                this.curExp += this.monBook[j].exp
+                                var tmp = this.monBook[j].sprMoney
+                                this.money += parseInt(tmp + Math.random() * (tmp / 2))
+                            }
+                        }
+                        this.monster.splice(i, 1)
+                    }
+                }
+
+                // curExp, needExp
+                // 1. 레벨이 오르는지 판정
+                //    curExp - needExp >= 0
+
+                // 2. 레벨이 오를수록 필요한 경험치 총량이 증가
+                //    레벨을 올리고 경험치 총량을 증가시킨다.
+                var criteria = this.curExp
+                for(; this.curExp >= this.needExp; ) {
+                    this.curExp = parseInt(this.curExp - this.needExp)
+                    // 레벨업은 for문 내부에서 진행한다.
+                    // 또한 경험치 총량의 증가 또한 여기서 진행한다.
+                    this.characterLv += 1
+                    this.characterHp += 10
+                    this.characterAtk += 2
+                    // 방어력 계산 절차
+                    // onlyCalcDef를 계산용으로 사용하므로
+                    // 실제 계산은 onlyCalcDef에 적용하도록 한다.
+                    // 버림을 하여 산출한 정수값을 characterDef에 적용한다.
+                    this.onlyCalcDef += 0.4
+                    this.characterDef = Math.floor(this.onlyCalcDef)
+                    // 총량의 증가 정책은 어떻게 할것인가 ?
+                    // 원래값 + 원래값 * 0.5
+                    // 원래값 * 1.5
+                    if(this.characterLv < 10) {
+                        this.needExp = parseInt(this.needExp * 1.1)
+                    } else if(this.characterLv < 20) {
+                        this.needExp = parseInt(this.needExp * 1.2)
+                    } else if(this.characterLv < 30) {
+                        this.needExp = parseInt(this.needExp * 1.3)
+                    } else if(this.characterLv < 40) {
+                        this.needExp = parseInt(this.needExp * 1.4)
+                    } else if(this.characterLv < 50) {
+                        this.needExp = parseInt(this.needExp * 1.5)
+                    } else if(this.characterLv < 90) {
+                        this.needExp = parseInt(this.needExp * 1.7)
+                    } else if(this.characterLv < 100) {
+                        this.needExp = parseInt(this.needExp * 2)
+                    }
+                }
+            },
+            updated: function () {
+                // alert('Updated: ' + this.monster)
+            },
+            beforeDestroy: function () {
+                // alert('Before Destroy: ' + this.monster)
+            },
+            destroyed: function () {
+                // alert('Destroyed: ' + this.monster)
+            }
+        })
+    </script>
+</body>
+</html>
+
+<!--
+1. 캐릭터 이름, 레벨, 상태, HP, ATK, DEF 표시
+2. 경험치바 만들기 예) 110 / 150
+3. 몬스터에 경험치 추가
+4. 몬스터 잡으면 레벨업 기능을 추가해보자!
+-->

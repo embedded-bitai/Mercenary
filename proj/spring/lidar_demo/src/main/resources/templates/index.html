@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Main Page</title>
+</head>
+<body>
+    <h1>Main Page</h1>
+
+    <!-- 해당 버튼을 누르면 /doRequestPythonRest로 요청을 넣음
+         localhost:8080/doRequestPythonRest -->
+    <form th:action="@{/doRequestPythonRest}">
+        <input type="submit"
+               value="파이썬에 데이터 요청하기"/>
+    </form>
+    <!-- Model에 있는 servTime을 식별함!
+         Server Time: ${servTime}으로 실제 값을 뽑아온다. -->
+    <p th:text="${servTime}">Server Time: ${servTime}</p>
+    <p>레알 ?</p>
+    <form action="http://localhost:5000/imgServer"
+          method="POST" enctype="multipart/form-data">
+        <input type="file" name="file"/>
+        <input type="submit"/>
+    </form>
+
+    <form action="http://localhost:7777/chatting">
+        <input type="submit" value="Anonymous Chatting Page">
+    </form>
+    <form action="http://localhost:7777/vuetest">
+        <input type="submit" value="Local Vue Test Page">
+    </form>
+    <form action="http://localhost:7777/musics">
+        <input type="submit" value="Music Page">
+    </form>
+    <form action="http://localhost:7777/regtestpage">
+        <input type="submit" value="Register Test Page">
+    </form>
+    <form action="http://localhost:7777/list">
+        <input type="submit" value="Board List Page">
+    </form>
+    <!-- th:action Thymeleaf라는 녀석에서 행동에 대한 처리
+         우리가 버튼을 눌렀을때 어디로 링크시킬지를 결정한다.
+         @가 붙어있으면 중괄호가 쳐진 URL로 링크시킨다.
+         method 지정을 하지 않으면 디폴트로 GET으로 날아감
+         GET 방식은 ?가 붙어서 URL 만들어짐
+         POST는 json 방식을 사용 -->
+    <form th:action="@{/html/register}">
+        <input type="submit" value="register(GET)">
+    </form>
+    <form th:action="@{/html/register}" method="post">
+        <input type="submit" value="register(POST)">
+    </form>
+    <form th:action="@{/html/modify}">
+        <input type="submit" value="modify(GET)">
+    </form>
+    <form th:action="@{/html/modify}" method="post">
+        <input type="submit" value="modify(POST)">
+    </form>
+    <form th:action="@{/html/delete}" method="post">
+        <input type="submit" value="delete(POST)">
+    </form>
+</body>
+</html>
