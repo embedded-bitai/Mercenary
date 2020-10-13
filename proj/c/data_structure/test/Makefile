@@ -11,7 +11,7 @@ LIB_DIR = $(PWD)/../lib
 LIB_OBJS = $(shell find $(LIB_DIR) -name '*.o')
 
 #TARGET = custom_vector_test heap_sort_test quick_sort_test insert_sort_test
-TARGET = custom_vector_test heap_sort_test quick_sort_test insert_sort_test
+TARGET = custom_vector_test heap_sort_test quick_sort_test insert_sort_test mq_recv_test
 
 all: $(OBJS)
 all: $(TARGET)
@@ -27,6 +27,9 @@ quick_sort_test: quick_sort_test.o
 	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
 
 insert_sort_test: insert_sort_test.o
+	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
+
+mq_recv_test: mq_recv_test.o
 	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
 
 .c.o:

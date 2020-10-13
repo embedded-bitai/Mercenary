@@ -54,14 +54,14 @@ static inline void delay(_word_size_t ms){
 
 /* For Message Queue */
 typedef struct _lidar_info {
-    unsigned short   angle; // check_bit:1;angle_q6:15;
-    unsigned short   distance;
+    float   angle; // check_bit:1;angle_q6:15;
+    float   distance;
 } __attribute__((packed)) lidar_info;
 
 struct message
 {
     long msg_type;
-	lidar_info info[8192];
+	lidar_info info;
 };
 /* End Message Queue */
 
@@ -249,15 +249,29 @@ int main(int argc, const char * argv[]) {
             }
 #endif
 			for (int pos = 0; pos < (int)count; ++pos) {
-				msg.info[pos].angle = (nodes[pos].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f;
-				msg.info[pos].distance = nodes[pos].distance_q2 / 4.0f;
+				msg.info.angle = (nodes[pos].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f;
+				msg.info.distance = nodes[pos].distance_q2 / 4.0f;
+
+				if(msgsnd(msqid, &msg, sizeof(struct _lidar_info), 0) == -1)
+            	{
+            		printf("msgsnd failed\n");
+            		//exit(0);
+            	}
 			}
 
-			if(msgsnd(msqid, &msg, 32, 0) == -1)
+			//printf("Start Send\n");
+
+			//if(msgsnd(msqid, &msg, 32, 0) == -1)
+			//if(msgsnd(msqid, &msg, sizeof(msg), 0) == -1)
+#if 0
+			if(msgsnd(msqid, &msg, sizeof(struct _lidar_info), 0) == -1)
             {
             	printf("msgsnd failed\n");
-            	exit(0);
+            	//exit(0);
             }
+#endif
+
+			//usleep(500000);
         }
 
         if (ctrl_c_pressed){ 
@@ -265,6 +279,9 @@ int main(int argc, const char * argv[]) {
             break;
         }
     }
+
+	sleep(1);
+	printf("Stop Motor\n");
 
     drv->stop();
     drv->stopMotor();

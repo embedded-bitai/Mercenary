@@ -19,7 +19,7 @@
 #
 HOME_TREE := ../
 
-MAKE_TARGETS := simple_grabber ultra_simple 
+MAKE_TARGETS := simple_grabber ultra_simple print_test
 
 include $(HOME_TREE)/mak_def.inc
 
