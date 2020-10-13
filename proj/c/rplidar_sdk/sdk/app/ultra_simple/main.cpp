@@ -53,16 +53,21 @@ static inline void delay(_word_size_t ms){
 #endif
 
 /* For Message Queue */
+typedef struct _lidar_sample_count {
+	long msg_type;
+	int msg_count;
+} __attribute__((packed)) lidar_sample_count;
+
 typedef struct _lidar_info {
     float   angle; // check_bit:1;angle_q6:15;
     float   distance;
 } __attribute__((packed)) lidar_info;
 
-struct message
+typedef struct _message
 {
     long msg_type;
 	lidar_info info;
-};
+} __attribute__((packed)) message;;
 /* End Message Queue */
 
 using namespace rp::standalone::rplidar;
@@ -103,8 +108,12 @@ int main(int argc, const char * argv[]) {
     key_t key = 12345;
     int msqid;
 
-    struct message msg;
+    //struct message msg;
+    message msg = { 0 };
     msg.msg_type = 1;
+
+	lidar_sample_count lsc;
+	lsc.msg_type = 1;
 
     const char * opt_com_path = NULL;
     _u32         baudrateArray[2] = {115200, 256000};
@@ -112,6 +121,10 @@ int main(int argc, const char * argv[]) {
     u_result     op_result;
 
     bool useArgcBaudrate = false;
+
+	printf("struct message size = %d\n", sizeof(message));
+	printf("lidar_info size = %d\n", sizeof(lidar_info));
+	printf("send size = %d\n", sizeof(message) - sizeof(long));
 
     printf("Ultra simple LIDAR data grabber for RPLIDAR.\n"
            "Version: "RPLIDAR_SDK_VERSION"\n");
@@ -248,23 +261,39 @@ int main(int argc, const char * argv[]) {
                     nodes[pos].sync_quality >> RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT);
             }
 #endif
+			lsc.msg_count = count;
+			//msg.info.msg_count = count;
+
+			if(msgsnd(msqid, &lsc, sizeof(int), 0) == -1)
+			{
+				printf("count send fail\n");
+			}
+
 			for (int pos = 0; pos < (int)count; ++pos) {
 				msg.info.angle = (nodes[pos].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f;
 				msg.info.distance = nodes[pos].distance_q2 / 4.0f;
 
+#if 1
 				if(msgsnd(msqid, &msg, sizeof(struct _lidar_info), 0) == -1)
             	{
             		printf("msgsnd failed\n");
+					msgctl(msqid, IPC_RMID, 0);
+					drv->stop();
+					drv->stopMotor();
+					goto on_finished;
             		//exit(0);
             	}
+#endif
 			}
+
 
 			//printf("Start Send\n");
 
 			//if(msgsnd(msqid, &msg, 32, 0) == -1)
 			//if(msgsnd(msqid, &msg, sizeof(msg), 0) == -1)
 #if 0
-			if(msgsnd(msqid, &msg, sizeof(struct _lidar_info), 0) == -1)
+			//if(msgsnd(msqid, &msg, sizeof(struct _lidar_info), 0) == -1)
+			if(msgsnd(msqid, &msg, sizeof(struct _lidar_info), IPC_NOWAIT) == -1)
             {
             	printf("msgsnd failed\n");
             	//exit(0);

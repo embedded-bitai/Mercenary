@@ -22,6 +22,7 @@ public class LidarController {
     public String index(Locale locale, Model model) {
         log.info("index()");
 
+        /*
         Date date = new Date();
 
         DateFormat dateFormat = DateFormat.getDateTimeInstance(
@@ -30,6 +31,7 @@ public class LidarController {
 
         String formattedDate = dateFormat.format(date);
         model.addAttribute("servTime", formattedDate);
+         */
 
         return "index";
     }

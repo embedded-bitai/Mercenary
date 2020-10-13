@@ -13,15 +13,15 @@
 #include <linux/fs.h>
 #include <unistd.h>
 
-struct uart_data
-{
-    char buf[64];
-};
+typedef struct _lidar_info {
+    float   angle;
+    float   distance;
+} __attribute__((packed)) lidar_info;
 
 struct message
 {
     long msg_type;
-    struct uart_data data;
+    lidar_info info;
 };
 
 pid_t lidar_pid = 0;
@@ -50,7 +50,35 @@ void make_lidar_task(void)
 JNIEXPORT jstring JNICALL
 Java_com_example_lidar_demo_nativeinterface_lidar_LidarSpring_print(JNIEnv *env, jobject obj)
 {
+    int i;
+    key_t key = 12345;
+    int msqid;
+    struct message msg;
 
+    //받아오는 쪽의 msqid얻어오고
+    if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
+    {
+        printf("msgget failed\n");
+        exit(0);
+    }
+
+    for(;;)
+    {
+        //메시지를 받는다.
+        if(msgrcv(msqid, &msg, sizeof(struct _lidar_info), 1, 0) == -1)
+        {
+            printf("msgrcv failed\n");
+        }
+
+        printf("dist: %f, angle: %f\n", msg.info.distance, msg.info.angle);
+    }
+
+    //이후 메시지 큐를 지운다.
+    if(msgctl(msqid, IPC_RMID, NULL) == -1)
+    {
+        printf("msgctl failed\n");
+        exit(0);
+    }
 }
 
 JNIEXPORT void JNICALL

@@ -11,6 +11,11 @@
 #include <string.h>
 
 /* For Message Queue */
+typedef struct _lidar_sample_count {
+    long msg_type;
+    int msg_count;
+} __attribute__((packed)) lidar_sample_count;
+
 typedef struct _lidar_info {
     float   angle; // check_bit:1;angle_q6:15;
     float   distance;
