@@ -29,6 +29,13 @@ typedef struct _JNI_POSREC{
 
 JNI_POSREC *jniPosRec = NULL;
 
+jfloat *float_dist_buf;
+jfloat *float_angle_buf;
+
+float range;
+
+int count = 0;
+
 JNIEXPORT jint JNICALL
 Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_setIntArr
 (JNIEnv *env, jclass cls, jintArray ji_array, jint value)
@@ -104,6 +111,7 @@ Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_add
     return 1;
 }
 
+#if 0
 JNIEXPORT void JNICALL
 Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_readyToGetStruct
 (JNIEnv *env, jclass _cls, jlongArray dist1, jlongArray dist2, jlongArray angle1, jlongArray angle2, jint len)
@@ -123,7 +131,6 @@ Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_readyToGetStr
     if (long_dist_buf1 == NULL && long_angle_buf1 == NULL && long_dist_buf2 == NULL && long_angle_buf2 == NULL)
     {
         printf("Fail Allocate Memory\n");
-        return 0;
     }
 
     for (i = 0; i < len; i++)
@@ -158,6 +165,7 @@ Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_getStruct
 {
 
 }
+#endif
 
 #if 0
 bool make_struct(void *array, int len)
@@ -303,4 +311,36 @@ Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_readyToGetInt
 
     free(int_dist_buf);
     free(int_angle_buf);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_readyToGetFloatArray
+(JNIEnv *env, jclass cls)
+{
+    range = 360.0f / 1750.0f;
+
+    float_dist_buf = (jfloat *)malloc(sizeof(jfloat) * 1024);
+    float_angle_buf = (jfloat *)malloc(sizeof(jfloat) * 1024);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_getFloatArray
+(JNIEnv *env, jclass _cls, jfloatArray dist, jfloatArray angle)
+{
+    int i;
+
+    for (i = 0; i < 1024; i++)
+    {
+        float_dist_buf[i] = (jfloat)(rand() % 10 + 20);
+
+        if (count >= 1750)
+            count = 0;
+
+        float_angle_buf[i] = (jfloat)(range * count);
+
+        count++;
+    }
+
+    (*env)->SetFloatArrayRegion(env, dist, 0, 1024, (const jfloat *)float_dist_buf);
+    (*env)->SetFloatArrayRegion(env, angle, 0, 1024, (const jfloat *)float_angle_buf);
 }

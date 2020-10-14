@@ -8,6 +8,8 @@ public class ArrayReturnTest {
     native public static void getStruct(long[] dist1, long[] dist2, long[] angle1, long[] angle2);
     native public static TestStruct[] testStruct(int len);
     native public static void readyToGetIntArray(int[] dist, int[] angle, int len);
+    native public static void readyToGetFloatArray();
+    native public static void getFloatArray(float[] dist, float[] angle);
 
     static {
         System.loadLibrary("arrayreturntest");

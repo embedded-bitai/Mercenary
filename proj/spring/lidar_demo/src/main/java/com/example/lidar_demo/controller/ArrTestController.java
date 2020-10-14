@@ -16,6 +16,9 @@ import static com.example.lidar_demo.nativeinterface.cpptest.DonUseMallocFreeOnJ
 public class ArrTestController {
     static final Logger log = LoggerFactory.getLogger(ArrTestController.class);
 
+    float[] dist = new float[1024];
+    float[] angle = new float[1024];
+
     @GetMapping("/arraytest")
     public String index() throws InterruptedException {
         log.info("arraytest");
@@ -91,16 +94,42 @@ public class ArrTestController {
     public String longandint() throws InterruptedException {
         log.info("longandint");
 
-        int[] dist = new int[8192];
-        int[] angle = new int[8192];
+        int[] intDist = new int[8192];
+        int[] intAngle = new int[8192];
 
-        ArrayReturnTest.readyToGetIntArray(dist, angle, dist.length);
+        // 동작 성공 -> 여기서 데이터 받아서 화면에 뿌리는거 하셈
+        ArrayReturnTest.readyToGetIntArray(intDist, intAngle, intDist.length);
+
+        //Thread.sleep(1000);
+        for (int i = 0; i < intDist.length; i++) {
+            log.info("dist = " + intDist[i] + ", angle = " + intAngle[i]);
+        }
+
+        return "longandint";
+    }
+
+    @GetMapping("/setlidartest")
+    public String setlidartest() throws InterruptedException {
+        log.info("setlidartest");
+
+        ArrayReturnTest.readyToGetFloatArray();
+
+        return "lidar";
+    }
+
+    @GetMapping("/lidartest")
+    public String lidartest() throws InterruptedException {
+        log.info("lidartest");
+
+        // JVM Stack Frame의 한계로 일정 범위 이상은 Stack이 박살나는 현상을 초래함
+        // 좀 더 크게 잡아야 한 번에 데이터를 많이 땡겨올 수 있는데 반복적으로 JNI API를 호출시켜야함
+        ArrayReturnTest.getFloatArray(dist, angle);
 
         //Thread.sleep(1000);
         for (int i = 0; i < dist.length; i++) {
             log.info("dist = " + dist[i] + ", angle = " + angle[i]);
         }
 
-        return "longandint";
+        return "lidar";
     }
 }

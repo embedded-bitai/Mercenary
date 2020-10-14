@@ -63,6 +63,22 @@ JNIEXPORT jobjectArray JNICALL Java_com_example_lidar_1demo_nativeinterface_arra
 JNIEXPORT void JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_readyToGetIntArray
   (JNIEnv *, jclass, jintArray, jintArray, jint);
 
+/*
+ * Class:     com_example_lidar_demo_nativeinterface_array_ArrayReturnTest
+ * Method:    readyToGetFloatArray
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_readyToGetFloatArray
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     com_example_lidar_demo_nativeinterface_array_ArrayReturnTest
+ * Method:    getFloatArray
+ * Signature: ([F[F)V
+ */
+JNIEXPORT void JNICALL Java_com_example_lidar_1demo_nativeinterface_array_ArrayReturnTest_getFloatArray
+  (JNIEnv *, jclass, jfloatArray, jfloatArray);
+
 #ifdef __cplusplus
 }
 #endif
