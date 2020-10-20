@@ -10,18 +10,26 @@ extern "C" {
 /*
  * Class:     com_example_gsmdemo_nativeinterface_uart_UartSpring
  * Method:    phone_call
- * Signature: ()V
+ * Signature: (Ljava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call
-  (JNIEnv *, jclass);
+  (JNIEnv *, jclass, jstring);
 
 /*
  * Class:     com_example_gsmdemo_nativeinterface_uart_UartSpring
  * Method:    phone_msg_send
- * Signature: (Ljava/lang/String;)V
+ * Signature: (Ljava/lang/String;Ljava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1msg_1send
-  (JNIEnv *, jclass, jstring);
+  (JNIEnv *, jclass, jstring, jstring);
+
+/*
+ * Class:     com_example_gsmdemo_nativeinterface_uart_UartSpring
+ * Method:    gsm_init
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_gsm_1init
+  (JNIEnv *, jclass);
 
 /*
  * Class:     com_example_gsmdemo_nativeinterface_uart_UartSpring

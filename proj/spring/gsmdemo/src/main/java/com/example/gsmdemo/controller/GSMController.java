@@ -14,7 +14,7 @@ public class GSMController {
     public String phone_call() throws InterruptedException {
         log.info("phone_call()");
 
-        UartSpring.phone_call();
+        UartSpring.phone_call("01012341234");
 
         return "gsm";
     }
@@ -25,7 +25,7 @@ public class GSMController {
 
         String msg = "test message";
 
-        UartSpring.phone_msg_send(msg);
+        UartSpring.phone_msg_send("01012341234", msg);
 
         return "gsm";
     }
