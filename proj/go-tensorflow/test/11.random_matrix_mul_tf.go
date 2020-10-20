@@ -8,21 +8,31 @@ import (
 
 func main() {
 	root := op.NewScope()
+
 	normalW1 := op.RandomStandardNormal(root.SubScope("gauss"),
-										op.Const(root.SubScope("gauss"), []int32{2, 3}),
-										tf.Float)
+										op.Const(root.SubScope("gauss"), []int32{2, 3}), tf.Float)
 
 	w1 := op.VarHandleOp(root.SubScope("gauss"), tf.Float, tf.MakeShape(2, 3))
 	assignW1 := op.AssignVariableOp(root.SubScope("gauss"), w1, normalW1)
 	readW1 := op.ReadVariableOp(root.SubScope("gauss"), w1, tf.Float)
 
 	normalW2 := op.RandomStandardNormal(root.SubScope("gauss"),
-										op.Const(root.SubScope("gauss"), []int32{3, 1}),
-										tf.Float)
+										op.Const(root.SubScope("gauss"), []int32{3, 1}), tf.Float)
 
 	w2 := op.VarHandleOp(root.SubScope("gauss"), tf.Float, tf.MakeShape(3, 1))
 	assignW2 := op.AssignVariableOp(root.SubScope("gauss"), w2, normalW2)
 	readW2 := op.ReadVariableOp(root.SubScope("gauss"), w2, tf.Float)
+
+	x := op.Const(root.SubScope("constElem"), [][]float32{{0.7, 0.9}})
+
+	W1 := op.Placeholder(root.SubScope("elem"), tf.Float, op.PlaceholderShape(tf.MakeShape(2, 3)))
+	W2 := op.Placeholder(root.SubScope("elem"), tf.Float, op.PlaceholderShape(tf.MakeShape(3, 1)))
+
+	a := op.MatMul(root.SubScope("elem"), x, W1)
+	y := op.MatMul(root.SubScope("elem"), a, W2)
+
+	fmt.Println("x Shape: ")
+	fmt.Println(x.Shape())
 
 	graph, err := root.Finalize()
 	if err != nil {
@@ -41,16 +51,45 @@ func main() {
 	//if err != nil {
 	//	panic(err)
 	//}
-	if _, err := sess.Run(nil, nil, []*tf.Operation{assignW1, assignW2}); err != nil {
+	if _, err := sess.Run(nil, nil, []*tf.Operation{assignW1}); err != nil {
         panic(err)
 	}
 
-    resNormal, err := sess.Run(nil, []tf.Output{readW1, readW2}, nil)
+    resW1, err := sess.Run(nil, []tf.Output{readW1}, nil)
     if err != nil {
         panic(err)
     }
 
-	fmt.Println(resNormal)
-	fmt.Println(resNormal[0].Value())
-	fmt.Println(resNormal[1].Value())
+	if _, err := sess.Run(nil, nil, []*tf.Operation{assignW2}); err != nil {
+        panic(err)
+	}
+
+    resW2, err := sess.Run(nil, []tf.Output{readW2}, nil)
+    if err != nil {
+        panic(err)
+    }
+
+	fmt.Print("resW1: ")
+	fmt.Println(resW1[0].Value())
+	fmt.Println(resW1[0].Shape())
+
+	fmt.Print("resW2: ")
+	fmt.Println(resW2[0].Value())
+	fmt.Println(resW2[0].Shape())
+
+	//matW1 := op.DeepCopy(root.SubScope("elem"), resW1[0])
+	//matW2 := op.DeepCopy(root.SubScope("elem"), resW2[0])
+
+	//outputs, err := sess.Run(map[tf.Output] * tf.Tensor{W1: resW1, W2: resW2, }, []tf.Output{y}, nil)
+	outputs, err := sess.Run(map[tf.Output] * tf.Tensor{W1: resW1[0], W2: resW2[0], }, []tf.Output{y}, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, output := range outputs {
+		fmt.Println(output.Value())
+	}
+
+	fmt.Println(outputs)
+	fmt.Println(y)
 }
