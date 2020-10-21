@@ -5,8 +5,6 @@ int main(int argc, char **argv)
 	int fd;
     int baud;
     char dev_name[128];
-    char cc, buf[128];
-    int rdcnt;
 
     if(argc != 3)
     {
@@ -27,7 +25,7 @@ int main(int argc, char **argv)
         return -2;
 
 
-	gsm_msg_send(fd, "01012341234", "Hello");
+	gsm_msg_send(fd, "01029807183", "Hello BitAI");
 
 	close_serial(fd);
 

@@ -36,7 +36,7 @@ int main(int argc, char **argv)
         return -2;
 
 	signal(SIGINT, phone_call_exit);
-	gsm_phone_call(fd, "01012341234");
+	gsm_phone_call(fd, "01029807183");
 
 	for(; call_exit; )
 		;

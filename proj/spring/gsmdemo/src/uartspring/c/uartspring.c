@@ -35,6 +35,134 @@ char suffix[128];
 
 int current_location;
 
+int open_serial(char *dev_name, int baud, int vtime, int vmin)
+{
+    int fd;
+    struct termios newtio;
+
+    fd = open(dev_name, O_RDWR | O_NOCTTY);
+
+    if(fd < 0)
+    {
+        printf("Device Open Fail %s\n", dev_name);
+        return -1;
+    }
+
+    memset(&newtio, 0, sizeof(newtio));
+    newtio.c_iflag = IGNPAR;
+    newtio.c_oflag = 0;
+
+    newtio.c_cflag = CS8 | CLOCAL | CREAD;
+
+    switch(baud)
+    {
+        case 115200:
+            newtio.c_cflag |= B115200;
+            break;
+        case 57600:
+            newtio.c_cflag |= B57600;
+            break;
+        case 38400:
+            newtio.c_cflag |= B38400;
+            break;
+        case 19200:
+            newtio.c_cflag |= B19200;
+            break;
+        case 9600:
+            newtio.c_cflag |= B9600;
+            break;
+        case 4800:
+            newtio.c_cflag |= B4800;
+            break;
+        case 2400:
+            newtio.c_cflag |= B2400;
+            break;
+        default:
+            newtio.c_cflag |= B115200;
+            break;
+    }
+
+    newtio.c_lflag = 0;
+    newtio.c_cc[VTIME] = vtime;
+    newtio.c_cc[VMIN] = vmin;
+
+    tcflush(fd, TCIFLUSH);
+    tcsetattr(fd, TCSANOW, &newtio);
+
+    return fd;
+}
+
+void close_serial(int fd)
+{
+    close(fd);
+}
+
+void gsm_msg_send(int fd, const char *phone_num, const char *msg)
+{
+    int pn_len = strlen(phone_num);
+
+    char buf[128] = "";
+    char msg_buf[128] = "";
+    unsigned char hex_1A[128] = {0x1A, '\r', '\n'};
+    int buf_len;
+    int msg_len;
+
+    sprintf(buf, "AT+CMGS=\"%s\"\r\n", phone_num);
+    buf_len = strlen(buf);
+
+    sprintf(msg_buf, "%s\r\n", msg);
+    msg_len = strlen(msg_buf);
+
+    write(fd, "AT\r\n", 4);
+    sleep(1);
+    write(fd, "AT&F\r\n", 6);
+    sleep(1);
+    write(fd, "AT+CMGF=1\r\n", 11);
+    sleep(1);
+    write(fd, "AT+CSCS=\"GSM\"\r\n", 15);
+    sleep(1);
+    write(fd, buf, buf_len);
+    sleep(1);
+    write(fd, msg_buf, msg_len);
+    sleep(1);
+    write(fd, hex_1A, 3);
+    sleep(1);
+
+    printf("AT\n");
+    printf("AT&F\n");
+    printf("AT+CMGF=1\n");
+    printf("AT+CSCS=\"GSM\"\n");
+    printf("AT+CMGS=\"%s\"\n", phone_num);
+    printf("%s\n", msg);
+    printf("1A(hex)\n");
+}
+
+void gsm_phone_call(int fd, const char *phone_num)
+{
+    int pn_len = strlen(phone_num);
+
+    char buf[128] = "";
+    int buf_len;
+
+    sprintf(buf, "ATD%s;\r\n", phone_num);
+    buf_len = strlen(buf);
+
+    write(fd, "AT\r\n", 4);
+    sleep(1);
+
+    write(fd, buf, buf_len);
+    sleep(1);
+
+    sprintf(buf, "ATD%s;\r\n", phone_num);
+    buf_len = strlen(buf);
+    write(fd, buf, buf_len);
+    sleep(1);
+
+    printf("AT\n");
+    printf("ATD%s\n", phone_num);
+    printf("ATD%s;\n", phone_num);
+}
+
 // AT
 // ATD010xxxxyyyy
 // ATD010xxxxyyyy;
@@ -43,7 +171,7 @@ JNIEXPORT jstring JNICALL
 Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call
 (JNIEnv *env, jclass obj, jstring phone_num)
 {
-    const char *pn = env->GetStringUTFChars(phone_num, NULL);
+    const char *pn = (*env)->GetStringUTFChars(env, phone_num, NULL);
 
     int at_len = strlen(AT);
     int enter_len = strlen(ENTER);
@@ -51,6 +179,29 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call
 
     jstring res;
 
+    int fd;
+    int baud;
+    char dev_name[128];
+
+    strcpy(dev_name, "/dev/ttyACM0");
+    //baud = strtoul(argv[2], NULL, 10);
+    baud = 115200;
+
+    fd = open_serial(dev_name, baud, 10, 32);
+
+    if(fd < 0)
+    {
+        res = (*env)->NewStringUTF(env, "Fail to Calling Phone\n");
+        return res;
+    }
+
+    gsm_phone_call(fd, pn);
+
+    sleep(5);
+
+    close_serial(fd);
+
+#if 0
     // Set AT Command on buffer
     memmove(gsm_command_buf, AT, at_len);
     current_location += at_len;
@@ -106,6 +257,10 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call
     current_location += strlen(response_buf);
 
     res = (*env)->NewStringUTF(env, return_buf);
+#endif
+
+    res = (*env)->NewStringUTF(env, "Success to Calling Phone\n");
+
     return res;
 }
 
@@ -117,31 +272,38 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call
 // Send msg what you want
 // Send hex(1A)
 // Then you can receive the msg ("Send msg what you want")
-JNIEXPORT void JNICALL
+JNIEXPORT jstring JNICALL
 Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1msg_1send
 (JNIEnv *env, jclass obj, jstring phone_num, jstring msg)
 {
-    const char *pn = env->GetStringUTFChars(phone_num, NULL);
-    int pn_len = strlen(pn);
+    const char *pn = (*env)->GetStringUTFChars(env, phone_num, NULL);
+    const char *pmsg = (*env)->GetStringUTFChars(env, msg, NULL);
+    int fd;
+    int baud;
+    char dev_name[128];
 
-    char buf[128] = "AT+CMGS=\"";
-    int buf_len = strlen(buf);
-    int cur_len;
+    jstring res;
 
-    write(serial_fd, "AT\r\n", 4);
-    write(serial_fd, "AT&F", 4);
-    write(serial_fd, "AT+CMGF=1", 9);
-    write(serial_fd, "AT+CSCS=\"GSM\"\r\n", 15);
+    strcpy(dev_name, "/dev/ttyACM0");
+    baud = 115200;
 
-    memmove(&buf[buf_len], pn, pn_len);
-    cur_len = strlen(buf);
+    fd = open_serial(dev_name, baud, 10, 32);
 
-    buf[cur_len] = '\"';
-    buf[cur_len + 1] = '\r';
-    buf[cur_len + 2] = '\n';
+    if(fd < 0)
+    {
+        res = (*env)->NewStringUTF(env, "Fail to Calling Phone\n");
+        return res;
+    }
 
-    write(serial_fd, buf, strlen(buf));
-    write(serial_fd, "1A", 2);
+    gsm_msg_send(fd, pn, pmsg);
+
+    sleep(5);
+
+    close_serial(fd);
+
+    res = (*env)->NewStringUTF(env, "Success to Send Message to Phone\n");
+
+    return res;
 }
 
 int set_interface_attribs(int fd, int speed)
@@ -204,12 +366,12 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_gsm_1init
 
     serial_fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
 
-    if (fd < 0) {
+    if (serial_fd < 0) {
         printf("Error opening %s: %s\n", portname, strerror(errno));
         return -1;
     }
 
-    set_interface_attribs(fd, B9600);
+    set_interface_attribs(serial_fd, B9600);
 }
 
 JNIEXPORT jstring JNICALL

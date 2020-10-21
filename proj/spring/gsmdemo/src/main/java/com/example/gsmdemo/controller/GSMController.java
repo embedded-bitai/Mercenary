@@ -14,7 +14,7 @@ public class GSMController {
     public String phone_call() throws InterruptedException {
         log.info("phone_call()");
 
-        UartSpring.phone_call("01012341234");
+        log.info(UartSpring.phone_call("01029807183"));
 
         return "gsm";
     }
@@ -23,9 +23,9 @@ public class GSMController {
     public String phone_msg_send() throws InterruptedException {
         log.info("phone_msg_send()");
 
-        String msg = "test message";
+        String msg = "Hello BitAI from LTE with JNI";
 
-        UartSpring.phone_msg_send("01012341234", msg);
+        log.info(UartSpring.phone_msg_send("01029807183", msg));
 
         return "gsm";
     }
