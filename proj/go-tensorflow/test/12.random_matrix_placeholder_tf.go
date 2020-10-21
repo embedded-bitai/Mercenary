@@ -6,7 +6,6 @@ import (
 	"fmt"
 )
 
-// TODO: Need to fix it only Variable
 func main() {
 	root := op.NewScope()
 

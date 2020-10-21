@@ -6,7 +6,6 @@ import (
 	"fmt"
 )
 
-// TODO: Need to fix it only Variable
 func main() {
 	root := op.NewScope()
 
@@ -32,6 +31,13 @@ func main() {
 	a := op.MatMul(root.SubScope("elem"), x, W1)
 	y := op.MatMul(root.SubScope("elem"), a, W2)
 
+	MIN := op.Placeholder(root.SubScope("elem"), tf.Float, op.PlaceholderShape(tf.MakeShape(1, 1)))
+	MAX := op.Placeholder(root.SubScope("elem"), tf.Float, op.PlaceholderShape(tf.MakeShape(1, 1)))
+	Y := op.Placeholder(root.SubScope("elem"), tf.Float, op.PlaceholderShape(tf.MakeShape(1, 1)))
+
+	// func ClipByValue(scope *Scope, t tf.Output, clip_value_min tf.Output, clip_value_max tf.Output) (output tf.Output)
+	clipped := op.ClipByValue(root.SubScope("elem"), Y, MIN, MAX)
+
 	fmt.Println("x Shape: ")
 	fmt.Println(x.Shape())
 
@@ -45,6 +51,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	min, err := tf.NewTensor([1][1]float32{{1.0 / 10000000000.0}})
+    if err != nil {
+        panic(err)
+    }
+
+    max, err := tf.NewTensor([1][1]float32{{1.0}})
+    if err != nil {
+        panic(err)
+    }
 
 	fmt.Println(normalW1.Op.Name())
 
@@ -89,8 +105,48 @@ func main() {
 
 	for _, output := range outputs {
 		fmt.Println(output.Value())
+		fmt.Println(output.Shape())
 	}
 
 	fmt.Println(outputs)
 	fmt.Println(y)
+
+	tmp, err := tf.NewTensor(outputs[0].Value().([][]float32))
+	if err != nil {
+        panic(err)
+    }
+
+	outputs, err = sess.Run(map[tf.Output] * tf.Tensor{Y: tmp, MIN: min, MAX: max, }, []tf.Output{clipped}, nil)
+    if err != nil {
+        panic(err)
+    }
+
+    for _, output := range outputs {
+        fmt.Println(output.Value().([][]float32))
+    }
+
+	/*
+	outputs, err = sess.Run(map[tf.Output] * tf.Tensor{MIN: min, MAX: max, }, []tf.Output{clipped}, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, output := range outputs {
+		fmt.Println(output.Value())
+	}
+
+	res, err := sess.Run(nil, []tf.Output{clipped}, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, output := range res {
+		fmt.Println(output.Value())
+	}
+	*/
+
+	//fmt.Println("clipped Shape: ")
+	//fmt.Println(clipped.Shape())
+	//fmt.Println(clipped)
+
 }
