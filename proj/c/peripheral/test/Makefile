@@ -11,7 +11,7 @@ LIB_DIR = $(PWD)/../lib
 LIB_OBJS = $(shell find $(LIB_DIR) -name '*.o')
 
 #TARGET = custom_vector_test heap_sort_test quick_sort_test insert_sort_test
-TARGET = uart_recv_test uart_send_test gsm_msg_test gsm_phone_call_test
+TARGET = uart_recv_test uart_send_test gsm_msg_test gsm_phone_call_test gsm_daemon_test gsm_protocol_send_test
 
 all: $(OBJS)
 all: $(TARGET)
@@ -27,6 +27,12 @@ gsm_msg_test: gsm_msg_test.o
 	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
 
 gsm_phone_call_test: gsm_phone_call_test.o
+	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
+
+gsm_daemon_test: gsm_daemon_test.o
+	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
+
+gsm_protocol_send_test: gsm_protocol_send_test.o
 	$(CC) -o $@ $< $(LIB_OBJS) $(LIBS) -g
 
 .c.o:
