@@ -1,5 +1,6 @@
 #include <sys/types.h> 
 #include <sys/stat.h> 
+#include <string.h>
 #include <stdlib.h> 
 #include <stdio.h> 
 #include <fcntl.h> 
@@ -13,6 +14,7 @@
 typedef struct _control_message
 {
 	int protocol;
+	int operation;
 } control_message;
 
 typedef struct _control_packet
@@ -32,33 +34,50 @@ void protocol_msg_send(void)
 {
 	key_t key = 12345;
 	int msqid;
-	pid_t pid;
-	char value = 0;
+	int flag;
+
+	char tmp[4] = {0};
+	char value[4] = {0};
+	char msg_chk[128] = {0};
 
 	control_packet pkt = { 0 };
 	pkt.msg_type = 1;
 
-	if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
-	{
-		printf("msgget failed\n");
-		exit(0);
-	}
-
 	signal(SIGINT, set_continue_running);
+
+	flag = fcntl(0, F_GETFL, 0);
+	fcntl(0, F_SETFL, flag | O_NONBLOCK);	
 
 	for(; continue_running;)
 	{
-		pkt.msg.protocol = getchar();
-		printf("protocol = %d\n", pkt.msg.protocol);
+		read(0, value, 3);
+		memcpy(tmp, &value[2], 1);
+
+		pkt.msg.protocol = atoi(value);
+		pkt.msg.operation = atoi(tmp);
+
+		if(!pkt.msg.protocol && !pkt.msg.operation)
+			continue;
+
+		if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
+		{
+			printf("msgget failed\n");
+			exit(0);
+		}
+
+		printf("protocol = %d, oper = %d\n", pkt.msg.protocol, pkt.msg.operation);
 
 		if(msgsnd(msqid, &pkt, sizeof(control_message), 0) == -1)
 			printf("msgsnd control_message failed\n");
-	}
 
-	if(msgctl(msqid, IPC_RMID, NULL) == -1)
-	{
-		printf("msgctl failed\n");
-		exit(0);
+		if(msgctl(msqid, IPC_RMID, NULL) == -1)
+		{
+			printf("msgctl failed\n");
+			exit(0);
+		}
+
+		memset(value, 0x0, 4);
+		memset(tmp, 0x0, 4);
 	}
 }
 

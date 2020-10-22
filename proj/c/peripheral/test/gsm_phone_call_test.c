@@ -14,21 +14,11 @@ int main(int argc, char **argv)
 	int fd;
     int baud;
     char dev_name[128];
-    char cc, buf[128];
-    int rdcnt;
-
-    if(argc != 3)
-    {
-        printf("sample_serial[device][baud]\n" \
-                "device: /dev/ttyUSBx ...\n" \
-                "baud: 2400 ... 115200\n");
-        return -1;
-    }
 
 	printf("Serial Test Start... (%s)\n", __DATE__);
 
-    strcpy(dev_name, argv[1]);
-    baud = strtoul(argv[2], NULL, 10);
+    strcpy(dev_name, "/dev/ttyACM0");
+	baud = 115200;
 
     fd = open_serial(dev_name, baud, 10, 32);
 

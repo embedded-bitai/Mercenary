@@ -2,7 +2,7 @@ PWD = $(shell pwd)
 
 INC_DIRS += -I$(PWD)/../lib
 
-LIBS = -lm
+LIBS = -lm -lpthread
 
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:%.c=%.o)
@@ -39,7 +39,7 @@ gsm_protocol_send_test: gsm_protocol_send_test.o
 	@echo "**********************************"
 	@echo "********** Main Program **********"
 	@echo "**********************************"
-	$(CC) -c $< -o $@ $(INC_DIRS) -g
+	$(CC) -c $< -o $@ $(INC_DIRS) -g -lpthread -lm
 
 clean:
 	rm -rf *.o

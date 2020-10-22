@@ -12,7 +12,7 @@ all: $(OBJS)
 	@echo "********** Math Lib Module **********"
 	@echo "*************************************"
 #	$(CC) -c $< -o $@ $(INC_DIRS)
-	$(CC) -c $< $(INC_DIRS) -g
+	$(CC) -c $< $(INC_DIRS) -g -lpthread
 
 clean:
 	rm -rf *.o
