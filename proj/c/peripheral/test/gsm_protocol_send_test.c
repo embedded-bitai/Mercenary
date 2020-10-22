@@ -15,6 +15,8 @@ typedef struct _control_message
 {
 	int protocol;
 	int operation;
+	char phone_num[64];
+	char phone_msg[128];
 } control_message;
 
 typedef struct _control_packet
@@ -30,7 +32,7 @@ void set_continue_running(int signo)
 	continue_running = false;
 }
 
-void protocol_msg_send(void)
+void protocol_msg_send(char *phone_num, char *phone_msg)
 {
 	key_t key = 12345;
 	int msqid;
@@ -55,6 +57,8 @@ void protocol_msg_send(void)
 
 		pkt.msg.protocol = atoi(value);
 		pkt.msg.operation = atoi(tmp);
+		strcpy(pkt.msg.phone_num, phone_num);
+		strcpy(pkt.msg.phone_msg, phone_msg);
 
 		if(!pkt.msg.protocol && !pkt.msg.operation)
 			continue;
@@ -83,7 +87,7 @@ void protocol_msg_send(void)
 
 int main(void)
 {
-	protocol_msg_send();
+	protocol_msg_send("01029807183", "BitAI: Call to me");
 
 	return 0;
 

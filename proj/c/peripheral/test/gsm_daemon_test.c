@@ -10,11 +10,14 @@
 #include <sys/msg.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <string.h>
 
 typedef struct _control_message
 {
 	int protocol;
 	int operation;
+	char phone_num[64];
+	char phone_msg[128];
 } control_message;
 
 typedef struct _control_packet
@@ -25,71 +28,46 @@ typedef struct _control_packet
 
 bool continue_running = true;
 
-void set_continue_running(int signo)
+void do_not(int signo)
 {
-	continue_running = false;
 }
 
-pthread_mutex_t mtx;
-
-int protocol;
-int operation;
-
-void *mq_recv(void *none)
+void run_daemon(void)
 {
+	int i;
 	key_t key = 12345;
-	int msqid;
+    int msqid;
+	int protocol, operation;
+    struct _control_packet pkt;
+	pid_t call_pid, msg_pid;
+	char phone_num[64] = {0};
+	char phone_msg[128] = {0};
 
-	control_packet pkt = { 0 };
-	//pkt.msg_type = 1;
+	signal(SIGINT, do_not);
 
-	for(;;)
+	for(; continue_running;)
 	{
-		pthread_mutex_lock(&mtx);
+    	//받아오는 쪽의 msqid얻어오고
+    	if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
+    	{
+    	    printf("msgget failed\n");
+    	    exit(0);
+    	}
 
-		if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
+		if(msgrcv(msqid, &pkt, sizeof(struct _control_message), 1, 0) == -1)
 		{
-			printf("msgget failed\n");
-			exit(0);
+			//printf("msgrcv count failed\n");
 		}
 
-		if(msgrcv(msqid, &pkt, sizeof(control_message), 1, 0) == -1)
-		{
-			printf("What\n");
-		}
+		protocol = pkt.msg.protocol;
+		operation = pkt.msg.operation;
+		strcpy(phone_num, pkt.msg.phone_num);
+		strcpy(phone_msg, pkt.msg.phone_msg);
 
-		//printf("pkt.protocol = %d, oper = %d\n", pkt.msg.protocol, pkt.msg.operation);
-
-		if(pkt.msg.protocol == 1 || pkt.msg.protocol == 2)
-		{
-			protocol = pkt.msg.protocol;
-			operation = pkt.msg.operation;
-		}
-
-		if(msgctl(msqid, IPC_RMID, NULL) == -1)
-		{
-			//printf("msgctl failed\n");
-		}
-
-		pthread_mutex_lock(&mtx);
-
-		usleep(1000);
-	}
-}
-
-void *cmd_proc(void *none)
-{
-	pid_t call_pid;
-	pid_t msg_pid;
-
-	for(;;)
-	{
-		pthread_mutex_lock(&mtx);
-	
 		switch(protocol)
 		{
 			case 1:
-				printf("Recv 1: Phone Call\n");
+				printf("(1) Phone Call\n");
 
 				if(operation == 1)
 				{
@@ -100,20 +78,20 @@ void *cmd_proc(void *none)
 					else if(call_pid == 0)
 					{
 						printf("Start Phone Call\n");
-						execl("/home/oem/proj/bitai/team_proj/Mercenary/proj/c/peripheral/test/gsm_phone_call_test", "gsm_phone_call_test", "/dev/ttyACM0", 115200, (char *)0);
+						//execlp("gsm_phone_call_test", "gsm_phone_call_test", phone_num, (char *)0);
+						execlp("gsm_call", "gsm_call", phone_num, (char *)0);
 					}
 				}
 				else if(operation == 0)
 				{
 					printf("Device Already Connected\n");
-					kill(call_pid, SIGINT);
+					kill(call_pid, SIGKILL);
 					call_pid = 0;
 				}
 
 				break;
-
 			case 2:
-				printf("Recv 2: Message Send\n");
+				printf("(2) Phone SMS Send\n");
 
 				if(operation == 1)
 				{
@@ -124,54 +102,74 @@ void *cmd_proc(void *none)
 					else if(msg_pid == 0)
 					{
 						printf("Start Send Phone Message\n");
-						execl("./gsm_msg_test", "gsm_msg_test", "/dev/ttyACM0", 115200, (char *)0);
+						//execlp("gsm_msg_test", "gsm_msg_test", phone_num, msg, (char *)0);
+						execlp("gsm_send", "gsm_send", phone_num, phone_msg, (char *)0);
+						//execlp("ls", "ls", (char *)0);
 					}
 				}
 				else if(operation == 0)
 				{
 					printf("Kill Phone Message Send Process\n");
-					kill(msg_pid, SIGINT);
+					kill(msg_pid, SIGKILL);
 					msg_pid = 0;
 				}
 
 				break;
-
+			case 3:
+				printf("(3) Exit Process\n");
+				continue_running = false;
+				break;
 			default:
-				printf("Recv wrong info\n");
+				printf("Wrong Info\n");
 				break;
 		}
 
-		pthread_mutex_lock(&mtx);
+		protocol = 0;
+		operation = 0;
+		memset(phone_num, 0x0, 32);
+		memset(phone_msg, 0x0, 128);
 
-		usleep(1000);
+    	//이후 메시지 큐를 지운다.
+    	if(msgctl(msqid, IPC_RMID, NULL) == -1)
+    	{
+    	    //printf("msgctl failed\n");
+    	    //exit(0);
+    	}
+
+		memset(&pkt.msg, 0x0, 8);
 	}
 }
 
 int main(void)
 {
-	int thread_id, status;
-	pthread_t mq_recv_thread;
-	pthread_t command_thread;
+	pid_t pid;
+	int i; 
 
-	pthread_mutex_init(&mtx, NULL);
+	pid = fork();
 
-	thread_id = pthread_create(&mq_recv_thread, NULL, mq_recv, NULL);
-	if(thread_id < 0)
+	if(pid == -1)
 	{
-		printf("pthread_create Error\n");
-		exit(0);
+		printf("fork\n");	
+		return -1; 
+	} 
+
+	if(pid != 0)
+		exit(EXIT_SUCCESS);
+
+	if(setsid() == -1)
+		return -1; 
+
+	if(chdir("/") == -1)
+	{
+		printf("chdir()\n");
+		return -1;
 	}
 
-	thread_id = pthread_create(&command_thread, NULL, cmd_proc, NULL);
-	if(thread_id < 0)
-	{
-		printf("pthread_create Error\n");
-		exit(0);
-	}
+	open("/dev/null", O_RDWR);
+	dup(0);
+	dup(0);
 
-	pthread_join(mq_recv_thread, (void **)&status);
-	pthread_join(command_thread, (void **)&status);
+	run_daemon();
 
 	return 0;
-
 }

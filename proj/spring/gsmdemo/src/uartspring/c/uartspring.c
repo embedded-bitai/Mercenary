@@ -1,166 +1,86 @@
 #include <jni.h>
-#include <stdio.h>
+
 #include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/types.h>
-#include <sys/msg.h>
-#include <stdlib.h>
+#include <sys/stat.h>
 #include <string.h>
-
-#include <errno.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <fcntl.h>
-#include <termios.h>
 #include <unistd.h>
-#include <pthread.h>
+#include <linux/fs.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <stdbool.h>
+#include <signal.h>
 
-struct uart_data
+typedef struct _control_message
 {
-    char buf[64];
-};
+	int protocol;
+	int operation;
+} control_message;
 
-struct message
+typedef struct _control_packet
 {
-    long msg_type;
-    struct uart_data data;
-};
+	long msg_type;
+	control_message msg;
+} control_packet;
 
-int serial_fd;
-char gsm_command_buf[128];
+bool continue_running = true;
 
-char AT[128] = {'A', 'T'};
-char ENTER[128] = {'\r', '\n'};
-char return_buf[128];
-char response_buf[256];
-char suffix[128];
-
-int current_location;
-
-int open_serial(char *dev_name, int baud, int vtime, int vmin)
+void set_continue_running(int signo)
 {
-    int fd;
-    struct termios newtio;
-
-    fd = open(dev_name, O_RDWR | O_NOCTTY);
-
-    if(fd < 0)
-    {
-        printf("Device Open Fail %s\n", dev_name);
-        return -1;
-    }
-
-    memset(&newtio, 0, sizeof(newtio));
-    newtio.c_iflag = IGNPAR;
-    newtio.c_oflag = 0;
-
-    newtio.c_cflag = CS8 | CLOCAL | CREAD;
-
-    switch(baud)
-    {
-        case 115200:
-            newtio.c_cflag |= B115200;
-            break;
-        case 57600:
-            newtio.c_cflag |= B57600;
-            break;
-        case 38400:
-            newtio.c_cflag |= B38400;
-            break;
-        case 19200:
-            newtio.c_cflag |= B19200;
-            break;
-        case 9600:
-            newtio.c_cflag |= B9600;
-            break;
-        case 4800:
-            newtio.c_cflag |= B4800;
-            break;
-        case 2400:
-            newtio.c_cflag |= B2400;
-            break;
-        default:
-            newtio.c_cflag |= B115200;
-            break;
-    }
-
-    newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = vtime;
-    newtio.c_cc[VMIN] = vmin;
-
-    tcflush(fd, TCIFLUSH);
-    tcsetattr(fd, TCSANOW, &newtio);
-
-    return fd;
+	continue_running = false;
 }
 
-void close_serial(int fd)
+void protocol_msg_send(int protocol, int operation)
 {
-    close(fd);
-}
+	key_t key = 12345;
+	int msqid;
+	int flag;
 
-void gsm_msg_send(int fd, const char *phone_num, const char *msg)
-{
-    int pn_len = strlen(phone_num);
+	char tmp[4] = {0};
+	char value[4] = {0};
+	char msg_chk[128] = {0};
 
-    char buf[128] = "";
-    char msg_buf[128] = "";
-    unsigned char hex_1A[128] = {0x1A, '\r', '\n'};
-    int buf_len;
-    int msg_len;
+	control_packet pkt = { 0 };
+	pkt.msg_type = 1;
 
-    sprintf(buf, "AT+CMGS=\"%s\"\r\n", phone_num);
-    buf_len = strlen(buf);
+	signal(SIGINT, set_continue_running);
 
-    sprintf(msg_buf, "%s\r\n", msg);
-    msg_len = strlen(msg_buf);
+	flag = fcntl(0, F_GETFL, 0);
+	fcntl(0, F_SETFL, flag | O_NONBLOCK);
 
-    write(fd, "AT\r\n", 4);
-    sleep(1);
-    write(fd, "AT&F\r\n", 6);
-    sleep(1);
-    write(fd, "AT+CMGF=1\r\n", 11);
-    sleep(1);
-    write(fd, "AT+CSCS=\"GSM\"\r\n", 15);
-    sleep(1);
-    write(fd, buf, buf_len);
-    sleep(1);
-    write(fd, msg_buf, msg_len);
-    sleep(1);
-    write(fd, hex_1A, 3);
-    sleep(1);
+	for(; continue_running;)
+	{
+		read(0, value, 3);
+		memcpy(tmp, &value[2], 1);
 
-    printf("AT\n");
-    printf("AT&F\n");
-    printf("AT+CMGF=1\n");
-    printf("AT+CSCS=\"GSM\"\n");
-    printf("AT+CMGS=\"%s\"\n", phone_num);
-    printf("%s\n", msg);
-    printf("1A(hex)\n");
-}
+		pkt.msg.protocol = atoi(value);
+		pkt.msg.operation = atoi(tmp);
 
-void gsm_phone_call(int fd, const char *phone_num)
-{
-    int pn_len = strlen(phone_num);
+		if(!pkt.msg.protocol && !pkt.msg.operation)
+			continue;
 
-    char buf[128] = "";
-    int buf_len;
+		if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
+		{
+			printf("msgget failed\n");
+			exit(0);
+		}
 
-    sprintf(buf, "ATD%s;\r\n", phone_num);
-    buf_len = strlen(buf);
+		printf("protocol = %d, oper = %d\n", pkt.msg.protocol, pkt.msg.operation);
 
-    write(fd, "AT\r\n", 4);
-    sleep(1);
+		if(msgsnd(msqid, &pkt, sizeof(control_message), 0) == -1)
+			printf("msgsnd control_message failed\n");
 
-    write(fd, buf, buf_len);
-    sleep(1);
+		if(msgctl(msqid, IPC_RMID, NULL) == -1)
+		{
+			printf("msgctl failed\n");
+			exit(0);
+		}
 
-    sprintf(buf, "ATD%s;\r\n", phone_num);
-    buf_len = strlen(buf);
-    write(fd, buf, buf_len);
-    sleep(1);
-
-    printf("AT\n");
-    printf("ATD%s\n", phone_num);
-    printf("ATD%s;\n", phone_num);
+		memset(value, 0x0, 4);
+		memset(tmp, 0x0, 4);
+	}
 }
 
 // AT
@@ -178,6 +98,12 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call
     int pn_len = strlen(pn);
 
     jstring res;
+
+    protocol_msg_send(1, 1);
+
+    res = (*env)->NewStringUTF(env, "Success to Request Calling Phone\n");
+
+    protocol_msg_send(1, 0);
 
     int fd;
     int baud;
@@ -200,64 +126,6 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call
     sleep(5);
 
     close_serial(fd);
-
-#if 0
-    // Set AT Command on buffer
-    memmove(gsm_command_buf, AT, at_len);
-    current_location += at_len;
-
-    // Set Enter Key on buffer
-    memmove(&gsm_command_buf[current_location], ENTER, enter_len);
-    current_location += enter_len;
-
-    // Send AT Command to Device
-    write(serial_fd, gsm_command_buf, strlen(gsm_command_buf));
-    read(serial_fd, response_buf, sizeof(response_buf));
-
-    // Record Send Command
-    memmove(return_buf, gsm_command_buf, strlen(gsm_command_buf));
-    current_location += strlen(gsm_command_buf);
-
-    // Record Device Response
-    memmove(&return_buf[current_location], response_buf, strlen(response_buf));
-    current_location += strlen(response_buf);
-
-    // Set ATD010xxxxyyyy
-    memmove(&gsm_command_buf[2], 'D', 1);
-    memmove(&gsm_command_buf[3], pn, pn_len);
-    memmove(&gsm_command_buf[3 + pn_len], ENTER, enter_len);
-
-    // Send ATD010xxxxyyyy
-    write(serial_fd, gsm_command_buf, strlen(gsm_command_buf));
-    read(serial_fd, response_buf, sizeof(response_buf));
-
-    // Record ATD010xxxxyyyy Command
-    memmove(return_buf, gsm_command_buf, strlen(gsm_command_buf));
-    current_location += strlen(gsm_command_buf);
-
-    // Record Device Response
-    memmove(&return_buf[current_location], response_buf, strlen(response_buf));
-    current_location += strlen(response_buf);
-    memset(response_buf, 0x0, 32);
-
-    // Set ATD010xxxxyyyy;
-    memmove(&gsm_command_buf[strlen(gsm_command_buf)], ';', 1);
-    memmove(&gsm_command_buf[strlen(gsm_command_buf)], ENTER, enter_len);
-
-    // Send ATD010xxxxyyyy;
-    write(serial_fd, gsm_command_buf, strlen(gsm_command_buf));
-    read(serial_fd, response_buf, sizeof(response_buf));
-
-    //Record ATD010xxxxyyyy; Command
-    memmove(return_buf, gsm_command_buf, strlen(gsm_command_buf));
-    current_location += strlen(gsm_command_buf);
-
-    // Record Device Response
-    memmove(&return_buf[current_location], response_buf, sizeof(response_buf));
-    current_location += strlen(response_buf);
-
-    res = (*env)->NewStringUTF(env, return_buf);
-#endif
 
     res = (*env)->NewStringUTF(env, "Success to Calling Phone\n");
 

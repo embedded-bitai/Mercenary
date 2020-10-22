@@ -10,6 +10,8 @@ typedef struct _control_message
 {
 	int protocol;
 	int operation;
+	char phone_num[64];
+	char phone_msg[128];
 } control_message;
 
 typedef struct _control_packet
@@ -32,6 +34,8 @@ int main(void)
 	int protocol, operation;
     struct _control_packet pkt;
 	pid_t call_pid, msg_pid;
+	char phone_num[64] = {0};
+	char phone_msg[128] = {0};
 
 	signal(SIGINT, do_not);
 
@@ -51,6 +55,8 @@ int main(void)
 
 		protocol = pkt.msg.protocol;
 		operation = pkt.msg.operation;
+		strcpy(phone_num, pkt.msg.phone_num);
+		strcpy(phone_msg, pkt.msg.phone_msg);
 
 		switch(protocol)
 		{
@@ -66,7 +72,8 @@ int main(void)
 					else if(call_pid == 0)
 					{
 						printf("Start Phone Call\n");
-						execlp("gsm_phone_call_test", "gsm_phone_call_test", (char *)0);
+						//execlp("gsm_phone_call_test", "gsm_phone_call_test", phone_num, (char *)0);
+						execlp("gsm_call", "gsm_call", phone_num, (char *)0);
 					}
 				}
 				else if(operation == 0)
@@ -89,7 +96,8 @@ int main(void)
 					else if(msg_pid == 0)
 					{
 						printf("Start Send Phone Message\n");
-						execlp("gsm_msg_test", "gsm_msg_test", (char *)0);
+						//execlp("gsm_msg_test", "gsm_msg_test", phone_num, msg, (char *)0);
+						execlp("gsm_send", "gsm_send", phone_num, phone_msg, (char *)0);
 						//execlp("ls", "ls", (char *)0);
 					}
 				}
@@ -112,6 +120,8 @@ int main(void)
 
 		protocol = 0;
 		operation = 0;
+		memset(phone_num, 0x0, 32);
+		memset(phone_msg, 0x0, 128);
 
     	//이후 메시지 큐를 지운다.
     	if(msgctl(msqid, IPC_RMID, NULL) == -1)
