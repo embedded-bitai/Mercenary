@@ -25,6 +25,22 @@ JNIEXPORT jstring JNICALL Java_com_example_gsmdemo_nativeinterface_uart_UartSpri
 
 /*
  * Class:     com_example_gsmdemo_nativeinterface_uart_UartSpring
+ * Method:    phone_call_fin
+ * Signature: ()Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call_1fin
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     com_example_gsmdemo_nativeinterface_uart_UartSpring
+ * Method:    phone_msg_send_fin
+ * Signature: ()Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1msg_1send_1fin
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     com_example_gsmdemo_nativeinterface_uart_UartSpring
  * Method:    gsm_init
  * Signature: ()V
  */

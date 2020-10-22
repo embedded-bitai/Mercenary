@@ -12,11 +12,18 @@
 #include <sys/msg.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <sys/ioctl.h>
+#include <sys/poll.h>
+
+#include <termios.h>
+#include <errno.h>
 
 typedef struct _control_message
 {
 	int protocol;
 	int operation;
+	char phone_num[64];
+    char phone_msg[128];
 } control_message;
 
 typedef struct _control_packet
@@ -32,17 +39,13 @@ void set_continue_running(int signo)
 	continue_running = false;
 }
 
-void protocol_msg_send(int protocol, int operation)
+void protocol_msg_send(int protocol, int operation, const char* phone_num, const char* phone_msg)
 {
 	key_t key = 12345;
 	int msqid;
 	int flag;
 
-	char tmp[4] = {0};
-	char value[4] = {0};
-	char msg_chk[128] = {0};
-
-	control_packet pkt = { 0 };
+	struct _control_packet pkt;
 	pkt.msg_type = 1;
 
 	signal(SIGINT, set_continue_running);
@@ -50,37 +53,30 @@ void protocol_msg_send(int protocol, int operation)
 	flag = fcntl(0, F_GETFL, 0);
 	fcntl(0, F_SETFL, flag | O_NONBLOCK);
 
-	for(; continue_running;)
-	{
-		read(0, value, 3);
-		memcpy(tmp, &value[2], 1);
+    pkt.msg.protocol = protocol;
+    pkt.msg.operation = operation;
+    strcpy(pkt.msg.phone_num, phone_num);
+    strcpy(pkt.msg.phone_msg, phone_msg);
 
-		pkt.msg.protocol = atoi(value);
-		pkt.msg.operation = atoi(tmp);
+    if(!pkt.msg.protocol && !pkt.msg.operation)
+        return;
 
-		if(!pkt.msg.protocol && !pkt.msg.operation)
-			continue;
+    if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
+    {
+        printf("msgget failed\n");
+        exit(0);
+    }
 
-		if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
-		{
-			printf("msgget failed\n");
-			exit(0);
-		}
+    printf("protocol = %d, oper = %d\n", pkt.msg.protocol, pkt.msg.operation);
 
-		printf("protocol = %d, oper = %d\n", pkt.msg.protocol, pkt.msg.operation);
+    if(msgsnd(msqid, &pkt, sizeof(control_message), 0) == -1)
+        printf("msgsnd control_message failed\n");
 
-		if(msgsnd(msqid, &pkt, sizeof(control_message), 0) == -1)
-			printf("msgsnd control_message failed\n");
-
-		if(msgctl(msqid, IPC_RMID, NULL) == -1)
-		{
-			printf("msgctl failed\n");
-			exit(0);
-		}
-
-		memset(value, 0x0, 4);
-		memset(tmp, 0x0, 4);
-	}
+    if(msgctl(msqid, IPC_RMID, NULL) == -1)
+    {
+        printf("msgctl failed\n");
+        exit(0);
+    }
 }
 
 // AT
@@ -92,42 +88,13 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call
 (JNIEnv *env, jclass obj, jstring phone_num)
 {
     const char *pn = (*env)->GetStringUTFChars(env, phone_num, NULL);
-
-    int at_len = strlen(AT);
-    int enter_len = strlen(ENTER);
-    int pn_len = strlen(pn);
-
     jstring res;
 
-    protocol_msg_send(1, 1);
+    protocol_msg_send(1, 1, pn, NULL);
+
+    //protocol_msg_send(1, 0, pn);
 
     res = (*env)->NewStringUTF(env, "Success to Request Calling Phone\n");
-
-    protocol_msg_send(1, 0);
-
-    int fd;
-    int baud;
-    char dev_name[128];
-
-    strcpy(dev_name, "/dev/ttyACM0");
-    //baud = strtoul(argv[2], NULL, 10);
-    baud = 115200;
-
-    fd = open_serial(dev_name, baud, 10, 32);
-
-    if(fd < 0)
-    {
-        res = (*env)->NewStringUTF(env, "Fail to Calling Phone\n");
-        return res;
-    }
-
-    gsm_phone_call(fd, pn);
-
-    sleep(5);
-
-    close_serial(fd);
-
-    res = (*env)->NewStringUTF(env, "Success to Calling Phone\n");
 
     return res;
 }
@@ -146,30 +113,37 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1msg_1send
 {
     const char *pn = (*env)->GetStringUTFChars(env, phone_num, NULL);
     const char *pmsg = (*env)->GetStringUTFChars(env, msg, NULL);
-    int fd;
-    int baud;
-    char dev_name[128];
-
     jstring res;
 
-    strcpy(dev_name, "/dev/ttyACM0");
-    baud = 115200;
+    protocol_msg_send(2, 1, pn, pmsg);
 
-    fd = open_serial(dev_name, baud, 10, 32);
+    res = (*env)->NewStringUTF(env, "Success to Request Sending SMS to Phone\n");
 
-    if(fd < 0)
-    {
-        res = (*env)->NewStringUTF(env, "Fail to Calling Phone\n");
-        return res;
-    }
+    return res;
+}
 
-    gsm_msg_send(fd, pn, pmsg);
+JNIEXPORT jstring JNICALL
+Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1call_1fin
+(JNIEnv *env, jclass obj)
+{
+    jstring res;
 
-    sleep(5);
+    protocol_msg_send(1, 0, NULL, NULL);
 
-    close_serial(fd);
+    res = (*env)->NewStringUTF(env, "Success to Request Finish Calling Phone\n");
 
-    res = (*env)->NewStringUTF(env, "Success to Send Message to Phone\n");
+    return res;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_phone_1msg_1send_1fin
+(JNIEnv *env, jclass obj)
+{
+    jstring res;
+
+    protocol_msg_send(1, 0, NULL, NULL);
+
+    res = (*env)->NewStringUTF(env, "Success to Request Finish Sending SMS\n");
 
     return res;
 }
@@ -225,6 +199,7 @@ void set_mincount(int fd, int mcount)
         printf("Error tcsetattr: %s\n", strerror(errno));
 }
 
+#if 0
 JNIEXPORT void JNICALL
 Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_gsm_1init
 (JNIEnv *env, jclass obj)
@@ -277,3 +252,4 @@ Java_com_example_gsmdemo_nativeinterface_uart_UartSpring_print
     result = (*env)->NewStringUTF(env, msg.data.buf);
     return result;
 }
+#endif
