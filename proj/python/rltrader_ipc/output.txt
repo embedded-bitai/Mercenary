@@ -1,0 +1,12 @@
+[    9.082138] snd_hda_intel 0000:00:1b.0: enabling device (0000 -> 0002)
+[    9.082327] snd_hda_intel 0000:01:00.1: enabling device (0000 -> 0002)
+[    9.082358] snd_hda_intel 0000:01:00.1: Disabling MSI
+[    9.082362] snd_hda_intel 0000:01:00.1: Handle vga_switcheroo audio client
+[    9.117096] snd_hda_codec_realtek hdaudioC0D0: autoconfig for ALC662 rev3: line_outs=1 (0x14/0x0/0x0/0x0/0x0) type:line
+[    9.117098] snd_hda_codec_realtek hdaudioC0D0:    speaker_outs=0 (0x0/0x0/0x0/0x0/0x0)
+[    9.117098] snd_hda_codec_realtek hdaudioC0D0:    hp_outs=1 (0x1b/0x0/0x0/0x0/0x0)
+[    9.117099] snd_hda_codec_realtek hdaudioC0D0:    mono: mono_out=0x0
+[    9.117099] snd_hda_codec_realtek hdaudioC0D0:    inputs:
+[    9.117100] snd_hda_codec_realtek hdaudioC0D0:      Front Mic=0x19
+[    9.117101] snd_hda_codec_realtek hdaudioC0D0:      Rear Mic=0x18
+[    9.117102] snd_hda_codec_realtek hdaudioC0D0:      Line=0x1a
