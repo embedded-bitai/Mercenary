@@ -77,6 +77,8 @@ void *network_recv(void *fd)
         flag = fcntl(clnt_sock, F_GETFL, 0);
         fcntl(clnt_sock, F_SETFL, flag | O_NONBLOCK);
 
+		// TODO: Need to management Client Sockets
+		//       Currently Support Only One Client
         for(;;)
         {
             pthread_mutex_lock(&mtx);
@@ -199,6 +201,8 @@ void *command_proc(void *fd)
 				printf("(3) Kill Daemon\n");
 				kill(msg_pid, SIGINT);
 				kill(call_pid, SIGINT);
+				//close(clnt_sock);
+				close(serv_sock);
 				exit(0);
 				break;
         }

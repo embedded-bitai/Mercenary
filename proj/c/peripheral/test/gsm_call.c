@@ -31,11 +31,12 @@ int main(int argc, char **argv)
     if(fd < 0)
         return -2;
 
-	signal(SIGINT, phone_call_exit);
+	//signal(SIGINT, phone_call_exit);
 	gsm_phone_call(fd, argv[1]);
 
-	for(; call_exit; )
-		;
+	//for(; call_exit; )
+	//	;
+	sleep(3);
 
 	close_serial(fd);
 

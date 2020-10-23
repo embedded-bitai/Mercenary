@@ -24,6 +24,8 @@ int main(int argc, char **argv)
 
 	gsm_msg_send(fd, argv[1], argv[2]);
 
+	sleep(10);
+
 	close_serial(fd);
 
 	printf("Message Send Success\n");

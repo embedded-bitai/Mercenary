@@ -119,14 +119,23 @@ void gsm_msg_send(int fd, char *phone_num, char *msg)
 
     char buf[128] = "";
 	char msg_buf[128] = "";
+    char remove_enter_buf[128] = "";
+    char remove_enter_msg_buf[128] = "";
 	unsigned char hex_1A[128] = {0x1A, '\r', '\n'};
+
     int buf_len;
     int msg_len;
 
-	sprintf(buf, "AT+CMGS=\"%s\"\r\n", phone_num);
+	printf("phone_num length = %d\n", strlen(phone_num));
+	printf("phone_msg length = %d\n", strlen(msg));
+
+	strncpy(remove_enter_buf, phone_num, 11);
+	strncpy(remove_enter_msg_buf, msg, strlen(msg) - 1);
+
+	sprintf(buf, "AT+CMGS=\"%s\"\r\n", remove_enter_buf);
 	buf_len = strlen(buf);
 
-	sprintf(msg_buf, "%s\r\n", msg);
+	sprintf(msg_buf, "%s\r\n", remove_enter_msg_buf);
 	msg_len = strlen(msg_buf);
 
     write(fd, "AT\r\n", 4);
@@ -148,8 +157,8 @@ void gsm_msg_send(int fd, char *phone_num, char *msg)
 	printf("AT&F\n");
 	printf("AT+CMGF=1\n");
 	printf("AT+CSCS=\"GSM\"\n");
-	printf("AT+CMGS=\"%s\"\n", phone_num);
-	printf("%s\n", msg);
+	printf("AT+CMGS=\"%s\"\n", remove_enter_buf);
+	printf("%s\n", msg_buf);
 	printf("1A\n");
 }
 
@@ -158,10 +167,15 @@ void gsm_phone_call(int fd, char *phone_num)
 	int pn_len = strlen(phone_num);
 
     char buf[128] = "";
+	char remove_enter_buf[64] = "";
     int buf_len;
 
-	sprintf(buf, "ATD%s;\r\n", phone_num);
+	strncpy(remove_enter_buf, phone_num, 11);
+
+	sprintf(buf, "ATD%s;\r\n", remove_enter_buf);
 	buf_len = strlen(buf);
+
+	printf("Phone Num Length = %d\n", pn_len);
 
     write(fd, "AT\r\n", 4);
 	sleep(1);
@@ -169,13 +183,13 @@ void gsm_phone_call(int fd, char *phone_num)
     write(fd, buf, buf_len);
 	sleep(1);
 
-	sprintf(buf, "ATD%s;\r\n", phone_num);
+	sprintf(buf, "ATD%s;\r\n", remove_enter_buf);
 	buf_len = strlen(buf);
     write(fd, buf, buf_len);
 	sleep(1);
 
 	printf("AT\n");
-	printf("ATD%s\n", phone_num);
-	printf("ATD%s;\n", phone_num);
+	printf("ATD%s\n", remove_enter_buf);
+	printf("ATD%s;\n", remove_enter_buf);
 }
 

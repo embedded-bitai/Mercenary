@@ -68,6 +68,7 @@ public class GSMController {
         log.info("phone_msg_send()");
 
         String phoneNum = "01029807183";
+        //String phoneNum = "01072400150";
         String phoneMsg = "Hello BitAI from LTE with JNI";
 
         sc.sendData(2, 1, phoneNum, phoneMsg);
