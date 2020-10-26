@@ -1,0 +1,2602 @@
+<: setOutputDirectory "./":>
+<: set filename "sync_ip_v1_0_2" :>
+<: print $filename :>
+<: setFileName $filename :>
+<: setFileExportedName $filename :>
+<: setFileExtension .v :>
+//<: setFileLogicalName sync_ip :>
+
+`timescale 1 ns / 1 ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: Xilinx, Inc.
+// Engineer: Kamalesh V
+// 
+// Create Date: 04/24/2018 01:24:00 PM
+// Design Name: VCU low latency synchronization IP
+// Module Name: sync_ip_v1_0_2
+// Project Name: VCU low latency 
+// Target Devices: Zynq UltraScale+ EV
+// Tool Versions: Vivado 2018.1
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+//
+// TODO: Error handling  
+//////////////////////////////////////////////////////////////////////////////////
+
+module sync_ip_v1_0_2 
+#(
+   parameter ENABLE_ENC_DEC_HDL = 0,//"TRUE",
+   parameter NO_OF_ENC_CHAN_HDL =  4,//"TRUE",
+   parameter NO_OF_DEC_CHAN_HDL =  2,//"TRUE",
+   parameter NO_OF_CONSUMERS_HDL =  2,//"TRUE",
+
+   parameter HDL_PORT_CTRL_EN =  1,//"TRUE",
+   parameter HDL_PORT_MM_0_EN =  1,//"TRUE",
+   parameter HDL_PORT_MM_1_EN =  1,//"TRUE",
+   parameter HDL_PORT_MM_P_0_EN =  1,//"TRUE",
+   parameter HDL_PORT_MM_P_1_EN =  1,//"TRUE",
+   parameter HDL_PORT_MM_P_2_EN =  1,//"TRUE",
+   parameter HDL_PORT_MM_P_3_EN =  1,//"TRUE",
+   parameter HDL_PORT_MST_MM_0_EN =  1,//"TRUE",
+   parameter HDL_PORT_MST_MM_1_EN =  1,//"TRUE",
+   // Users to add parameters here
+   //parameter integer C_DEC_ENC_N = <: print [get_property MODELPARAM_VALUE.ENABLE_ENC_DEC_HDL] :>,//0, // Encoder (0) or Decoder (1)
+   //parameter integer PRODUCER_PORTS  = C_DEC_ENC_N ? <: print [get_property MODELPARAM_VALUE.NO_OF_DEC_CHAN_HDL] :>  : <: print [get_property MODELPARAM_VALUE.NO_OF_ENC_CHAN_HDL] :> ,
+   //parameter integer CONSUMER_PORTS  = <: print [get_property MODELPARAM_VALUE.NO_OF_CONSUMERS_HDL] :> ,  
+
+   parameter integer C_DEC_ENC_N = ENABLE_ENC_DEC_HDL, //0, // Encoder (0) or Decoder (1)
+   parameter integer PRODUCER_PORTS  = C_DEC_ENC_N ? NO_OF_DEC_CHAN_HDL : NO_OF_ENC_CHAN_HDL ,
+   parameter integer CONSUMER_PORTS  = NO_OF_CONSUMERS_HDL,  
+
+
+   parameter integer C_VIDEO_CHAN  = 4,  // Encoder (1,2,3,4), Decoder (1,2)
+   //parameter integer C_DEC_ENC_N = 0, // Encoder (0) or Decoder (1)
+   parameter [2:0]   C_SRC_FRAME_DETECT = 3'b000,
+   parameter [2:0]   C_RECONSTRUCTED_FRAME_DETECT = 3'b010,
+   parameter [23:0]  C_PRODUCER_TIMEOUT = 24'h4C4840, //2_0000,
+   parameter [23:0]  C_CONSUMER_TIMEOUT = 24'h4C4840, //2_0000,
+   parameter integer C_RD_BUF_CNT_WIDTH = 32,
+   parameter integer C_BUF_CNT_WIDTH    = 10,
+   parameter integer C_BL_WIDTH         = 10,
+
+   // User parameters ends
+   // Do not modify the parameters beyond this line
+
+
+   // Parameters of Axi Slave Bus Interface S_AXI_CTRL
+   parameter integer C_S_AXI_CTRL_DATA_WIDTH	= 32,
+   parameter integer C_S_AXI_CTRL_ADDR_WIDTH	= 12, //#### Address bit increased from 10 to 12
+
+   // Parameters of Axi Slave Bus Interface S_AXI_MM_P
+   parameter integer C_S_AXI_MM_P_0_ID_WIDTH	= C_DEC_ENC_N ? 4:1,
+   parameter integer C_S_AXI_MM_P_0_DATA_WIDTH	= 128,
+   parameter integer C_S_AXI_MM_P_0_ADDR_WIDTH	= 64,
+   parameter integer C_S_AXI_MM_P_0_AWUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_0_ARUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_0_WUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_0_RUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_0_BUSER_WIDTH	= 0,
+
+   parameter integer C_S_AXI_MM_P_1_ID_WIDTH	= C_DEC_ENC_N ? 4:1,
+   parameter integer C_S_AXI_MM_P_1_DATA_WIDTH	= 128,
+   parameter integer C_S_AXI_MM_P_1_ADDR_WIDTH	= 64,
+   parameter integer C_S_AXI_MM_P_1_AWUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_1_ARUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_1_WUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_1_RUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_1_BUSER_WIDTH	= 0,
+
+   parameter integer C_S_AXI_MM_P_2_ID_WIDTH	= C_DEC_ENC_N ? 4:1,
+   parameter integer C_S_AXI_MM_P_2_DATA_WIDTH	= 128,
+   parameter integer C_S_AXI_MM_P_2_ADDR_WIDTH	= 64,
+   parameter integer C_S_AXI_MM_P_2_AWUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_2_ARUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_2_WUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_2_RUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_2_BUSER_WIDTH	= 0,
+
+   parameter integer C_S_AXI_MM_P_3_ID_WIDTH	= C_DEC_ENC_N? 4:1,
+   parameter integer C_S_AXI_MM_P_3_DATA_WIDTH	= 128,
+   parameter integer C_S_AXI_MM_P_3_ADDR_WIDTH	= 64,
+   parameter integer C_S_AXI_MM_P_3_AWUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_3_ARUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_3_WUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_3_RUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_P_3_BUSER_WIDTH	= 0,
+  
+   // Parameters of Axi Master Bus Interface M_AXI_MM_0
+   parameter integer C_M_AXI_MM_0_BURST_LEN	= 16,
+   parameter integer C_M_AXI_MM_0_ID_WIDTH	= 4, //C_DEC_ENC_N? 1:4,
+   parameter integer C_M_AXI_MM_0_ADDR_WIDTH	= 64,
+   parameter integer C_M_AXI_MM_0_DATA_WIDTH	= 128,
+   parameter integer C_M_AXI_MM_0_AWUSER_WIDTH	= 0,
+   parameter integer C_M_AXI_MM_0_ARUSER_WIDTH	= 0,
+   parameter integer C_M_AXI_MM_0_WUSER_WIDTH	= 0,
+   parameter integer C_M_AXI_MM_0_RUSER_WIDTH	= 0,
+   parameter integer C_M_AXI_MM_0_BUSER_WIDTH	= 0,
+
+   // Parameters of Axi Master Bus Interface M_AXI_MM_1
+   parameter integer C_M_AXI_MM_1_BURST_LEN	= 16,
+   parameter integer C_M_AXI_MM_1_ID_WIDTH	= 4, //C_DEC_ENC_N? 1:4,
+   parameter integer C_M_AXI_MM_1_ADDR_WIDTH	= 64,
+   parameter integer C_M_AXI_MM_1_DATA_WIDTH	= 128,
+   parameter integer C_M_AXI_MM_1_AWUSER_WIDTH	= 0,
+   parameter integer C_M_AXI_MM_1_ARUSER_WIDTH	= 0,
+   parameter integer C_M_AXI_MM_1_WUSER_WIDTH	= 0,
+   parameter integer C_M_AXI_MM_1_RUSER_WIDTH	= 0,
+   parameter integer C_M_AXI_MM_1_BUSER_WIDTH	= 0,
+
+   // Parameters of Axi Slave Bus Interface S_AXI_MM_0
+   parameter integer C_S_AXI_MM_0_ID_WIDTH	= C_DEC_ENC_N? 1:4,
+   parameter integer C_S_AXI_MM_0_DATA_WIDTH	= 128,
+   parameter integer C_S_AXI_MM_0_ADDR_WIDTH	= 64,
+   parameter integer C_S_AXI_MM_0_AWUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_0_ARUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_0_WUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_0_RUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_0_BUSER_WIDTH	= 0,
+
+   // Parameters of Axi Slave Bus Interface S_AXI_MM_1
+   parameter integer C_S_AXI_MM_1_ID_WIDTH	= C_DEC_ENC_N? 1:4,
+   parameter integer C_S_AXI_MM_1_DATA_WIDTH	= 128,
+   parameter integer C_S_AXI_MM_1_ADDR_WIDTH	= 64,
+   parameter integer C_S_AXI_MM_1_AWUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_1_ARUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_1_WUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_1_RUSER_WIDTH	= 0,
+   parameter integer C_S_AXI_MM_1_BUSER_WIDTH	= 0
+   )
+   (
+    // Users to add ports here
+   
+    // User ports ends
+    // Do not modify the ports beyond this line
+
+
+    // Ports of Axi Slave Bus Interface S_AXI_CTRL
+
+    input wire  m_axi_mm_aclk,
+    input wire  m_axi_mm_aresetn,
+    input wire  s_axi_mm_aclk,
+    input wire  s_axi_mm_aresetn,
+    input wire  s_axi_mm_p_aclk,
+    input wire  s_axi_mm_p_aresetn,
+
+    input wire  s_axi_ctrl_aclk,
+    input wire  s_axi_ctrl_aresetn,
+    input wire [C_S_AXI_CTRL_ADDR_WIDTH-1 : 0] s_axi_ctrl_awaddr,
+    input wire [2 : 0] s_axi_ctrl_awprot,
+    input wire  s_axi_ctrl_awvalid,
+    output wire  s_axi_ctrl_awready,
+    input wire [C_S_AXI_CTRL_DATA_WIDTH-1 : 0] s_axi_ctrl_wdata,
+    input wire [(C_S_AXI_CTRL_DATA_WIDTH/8)-1 : 0] s_axi_ctrl_wstrb,
+    input wire  s_axi_ctrl_wvalid,
+    output wire  s_axi_ctrl_wready,
+    output wire [1 : 0] s_axi_ctrl_bresp,
+    output wire  s_axi_ctrl_bvalid,
+    input wire  s_axi_ctrl_bready,
+    input wire [C_S_AXI_CTRL_ADDR_WIDTH-1 : 0] s_axi_ctrl_araddr,
+    input wire [2 : 0] s_axi_ctrl_arprot,
+    input wire  s_axi_ctrl_arvalid,
+    output wire  s_axi_ctrl_arready,
+    output wire [C_S_AXI_CTRL_DATA_WIDTH-1 : 0] s_axi_ctrl_rdata,
+    output wire [1 : 0] s_axi_ctrl_rresp,
+    output wire  s_axi_ctrl_rvalid,
+    input wire  s_axi_ctrl_rready,
+
+    // Ports of Axi Slave Bus Interface S_AXI_MM_P, Monitor only
+    //input wire  s_axi_mm_p_0_aclk,
+    //input wire  s_axi_mm_p_0_aresetn,
+    input wire [C_S_AXI_MM_P_0_ID_WIDTH-1 : 0] s_axi_mm_p_0_awid,
+    input wire [C_S_AXI_MM_P_0_ADDR_WIDTH-1 : 0] s_axi_mm_p_0_awaddr,
+    input wire [7 : 0] s_axi_mm_p_0_awlen,
+    input wire [2 : 0] s_axi_mm_p_0_awsize,
+    input wire [1 : 0] s_axi_mm_p_0_awburst,
+    input wire  s_axi_mm_p_0_awlock,
+    input wire [3 : 0] s_axi_mm_p_0_awcache,
+    input wire [2 : 0] s_axi_mm_p_0_awprot,
+    input wire [3 : 0] s_axi_mm_p_0_awqos,
+    input wire [3 : 0] s_axi_mm_p_0_awregion,
+    input wire [C_S_AXI_MM_P_0_AWUSER_WIDTH-1 : 0] s_axi_mm_p_0_awuser,
+    input wire  s_axi_mm_p_0_awvalid,
+    input wire  s_axi_mm_p_0_awready,
+    input wire [C_S_AXI_MM_P_0_DATA_WIDTH-1 : 0] s_axi_mm_p_0_wdata,
+    input wire [(C_S_AXI_MM_P_0_DATA_WIDTH/8)-1 : 0] s_axi_mm_p_0_wstrb,
+    input wire  s_axi_mm_p_0_wlast,
+    input wire [C_S_AXI_MM_P_0_WUSER_WIDTH-1 : 0] s_axi_mm_p_0_wuser,
+    input wire  s_axi_mm_p_0_wvalid,
+    input wire  s_axi_mm_p_0_wready,
+    input wire [C_S_AXI_MM_P_0_ID_WIDTH-1 : 0] s_axi_mm_p_0_bid,
+    input wire [1 : 0] s_axi_mm_p_0_bresp,
+    input wire [C_S_AXI_MM_P_0_BUSER_WIDTH-1 : 0] s_axi_mm_p_0_buser,
+    input wire  s_axi_mm_p_0_bvalid,
+    input wire  s_axi_mm_p_0_bready,
+    input wire [C_S_AXI_MM_P_0_ID_WIDTH-1 : 0] s_axi_mm_p_0_arid,
+    input wire [C_S_AXI_MM_P_0_ADDR_WIDTH-1 : 0] s_axi_mm_p_0_araddr,
+    input wire [7 : 0] s_axi_mm_p_0_arlen,
+    input wire [2 : 0] s_axi_mm_p_0_arsize,
+    input wire [1 : 0] s_axi_mm_p_0_arburst,
+    input wire  s_axi_mm_p_0_arlock,
+    input wire [3 : 0] s_axi_mm_p_0_arcache,
+    input wire [2 : 0] s_axi_mm_p_0_arprot,
+    input wire [3 : 0] s_axi_mm_p_0_arqos,
+    input wire [3 : 0] s_axi_mm_p_0_arregion,
+    input wire [C_S_AXI_MM_P_0_ARUSER_WIDTH-1 : 0] s_axi_mm_p_0_aruser,
+    input wire  s_axi_mm_p_0_arvalid,
+    input wire  s_axi_mm_p_0_arready,
+    input wire [C_S_AXI_MM_P_0_ID_WIDTH-1 : 0] s_axi_mm_p_0_rid,
+    input wire [C_S_AXI_MM_P_0_DATA_WIDTH-1 : 0] s_axi_mm_p_0_rdata,
+    input wire [1 : 0] s_axi_mm_p_0_rresp,
+    input wire  s_axi_mm_p_0_rlast,
+    input wire [C_S_AXI_MM_P_0_RUSER_WIDTH-1 : 0] s_axi_mm_p_0_ruser,
+    input wire  s_axi_mm_p_0_rvalid,
+    input wire  s_axi_mm_p_0_rready,
+
+
+    //input wire  s_axi_mm_p_1_aclk,
+    //input wire  s_axi_mm_p_1_aresetn,
+    input wire [C_S_AXI_MM_P_1_ID_WIDTH-1 : 0] s_axi_mm_p_1_awid,
+    input wire [C_S_AXI_MM_P_1_ADDR_WIDTH-1 : 0] s_axi_mm_p_1_awaddr,
+    input wire [7 : 0] s_axi_mm_p_1_awlen,
+    input wire [2 : 0] s_axi_mm_p_1_awsize,
+    input wire [1 : 0] s_axi_mm_p_1_awburst,
+    input wire  s_axi_mm_p_1_awlock,
+    input wire [3 : 0] s_axi_mm_p_1_awcache,
+    input wire [2 : 0] s_axi_mm_p_1_awprot,
+    input wire [3 : 0] s_axi_mm_p_1_awqos,
+    input wire [3 : 0] s_axi_mm_p_1_awregion,
+    input wire [C_S_AXI_MM_P_1_AWUSER_WIDTH-1 : 0] s_axi_mm_p_1_awuser,
+    input wire  s_axi_mm_p_1_awvalid,
+    input wire  s_axi_mm_p_1_awready,
+    input wire [C_S_AXI_MM_P_1_DATA_WIDTH-1 : 0] s_axi_mm_p_1_wdata,
+    input wire [(C_S_AXI_MM_P_1_DATA_WIDTH/8)-1 : 0] s_axi_mm_p_1_wstrb,
+    input wire  s_axi_mm_p_1_wlast,
+    input wire [C_S_AXI_MM_P_1_WUSER_WIDTH-1 : 0] s_axi_mm_p_1_wuser,
+    input wire  s_axi_mm_p_1_wvalid,
+    input wire  s_axi_mm_p_1_wready,
+    input wire [C_S_AXI_MM_P_1_ID_WIDTH-1 : 0] s_axi_mm_p_1_bid,
+    input wire [1 : 0] s_axi_mm_p_1_bresp,
+    input wire [C_S_AXI_MM_P_1_BUSER_WIDTH-1 : 0] s_axi_mm_p_1_buser,
+    input wire  s_axi_mm_p_1_bvalid,
+    input wire  s_axi_mm_p_1_bready,
+    input wire [C_S_AXI_MM_P_1_ID_WIDTH-1 : 0] s_axi_mm_p_1_arid,
+    input wire [C_S_AXI_MM_P_1_ADDR_WIDTH-1 : 0] s_axi_mm_p_1_araddr,
+    input wire [7 : 0] s_axi_mm_p_1_arlen,
+    input wire [2 : 0] s_axi_mm_p_1_arsize,
+    input wire [1 : 0] s_axi_mm_p_1_arburst,
+    input wire  s_axi_mm_p_1_arlock,
+    input wire [3 : 0] s_axi_mm_p_1_arcache,
+    input wire [2 : 0] s_axi_mm_p_1_arprot,
+    input wire [3 : 0] s_axi_mm_p_1_arqos,
+    input wire [3 : 0] s_axi_mm_p_1_arregion,
+    input wire [C_S_AXI_MM_P_1_ARUSER_WIDTH-1 : 0] s_axi_mm_p_1_aruser,
+    input wire  s_axi_mm_p_1_arvalid,
+    input wire  s_axi_mm_p_1_arready,
+    input wire [C_S_AXI_MM_P_1_ID_WIDTH-1 : 0] s_axi_mm_p_1_rid,
+    input wire [C_S_AXI_MM_P_1_DATA_WIDTH-1 : 0] s_axi_mm_p_1_rdata,
+    input wire [1 : 0] s_axi_mm_p_1_rresp,
+    input wire  s_axi_mm_p_1_rlast,
+    input wire [C_S_AXI_MM_P_1_RUSER_WIDTH-1 : 0] s_axi_mm_p_1_ruser,
+    input wire  s_axi_mm_p_1_rvalid,
+    input wire  s_axi_mm_p_1_rready,
+
+
+    //input wire  s_axi_mm_p_2_aclk,
+    //input wire  s_axi_mm_p_2_aresetn,
+    input wire [C_S_AXI_MM_P_2_ID_WIDTH-1 : 0] s_axi_mm_p_2_awid,
+    input wire [C_S_AXI_MM_P_2_ADDR_WIDTH-1 : 0] s_axi_mm_p_2_awaddr,
+    input wire [7 : 0] s_axi_mm_p_2_awlen,
+    input wire [2 : 0] s_axi_mm_p_2_awsize,
+    input wire [1 : 0] s_axi_mm_p_2_awburst,
+    input wire  s_axi_mm_p_2_awlock,
+    input wire [3 : 0] s_axi_mm_p_2_awcache,
+    input wire [2 : 0] s_axi_mm_p_2_awprot,
+    input wire [3 : 0] s_axi_mm_p_2_awqos,
+    input wire [3 : 0] s_axi_mm_p_2_awregion,
+    input wire [C_S_AXI_MM_P_2_AWUSER_WIDTH-1 : 0] s_axi_mm_p_2_awuser,
+    input wire  s_axi_mm_p_2_awvalid,
+    input wire  s_axi_mm_p_2_awready,
+    input wire [C_S_AXI_MM_P_2_DATA_WIDTH-1 : 0] s_axi_mm_p_2_wdata,
+    input wire [(C_S_AXI_MM_P_2_DATA_WIDTH/8)-1 : 0] s_axi_mm_p_2_wstrb,
+    input wire  s_axi_mm_p_2_wlast,
+    input wire [C_S_AXI_MM_P_2_WUSER_WIDTH-1 : 0] s_axi_mm_p_2_wuser,
+    input wire  s_axi_mm_p_2_wvalid,
+    input wire  s_axi_mm_p_2_wready,
+    input wire [C_S_AXI_MM_P_2_ID_WIDTH-1 : 0] s_axi_mm_p_2_bid,
+    input wire [1 : 0] s_axi_mm_p_2_bresp,
+    input wire [C_S_AXI_MM_P_2_BUSER_WIDTH-1 : 0] s_axi_mm_p_2_buser,
+    input wire  s_axi_mm_p_2_bvalid,
+    input wire  s_axi_mm_p_2_bready,
+    input wire [C_S_AXI_MM_P_2_ID_WIDTH-1 : 0] s_axi_mm_p_2_arid,
+    input wire [C_S_AXI_MM_P_2_ADDR_WIDTH-1 : 0] s_axi_mm_p_2_araddr,
+    input wire [7 : 0] s_axi_mm_p_2_arlen,
+    input wire [2 : 0] s_axi_mm_p_2_arsize,
+    input wire [1 : 0] s_axi_mm_p_2_arburst,
+    input wire  s_axi_mm_p_2_arlock,
+    input wire [3 : 0] s_axi_mm_p_2_arcache,
+    input wire [2 : 0] s_axi_mm_p_2_arprot,
+    input wire [3 : 0] s_axi_mm_p_2_arqos,
+    input wire [3 : 0] s_axi_mm_p_2_arregion,
+    input wire [C_S_AXI_MM_P_2_ARUSER_WIDTH-1 : 0] s_axi_mm_p_2_aruser,
+    input wire  s_axi_mm_p_2_arvalid,
+    input wire  s_axi_mm_p_2_arready,
+    input wire [C_S_AXI_MM_P_2_ID_WIDTH-1 : 0] s_axi_mm_p_2_rid,
+    input wire [C_S_AXI_MM_P_2_DATA_WIDTH-1 : 0] s_axi_mm_p_2_rdata,
+    input wire [1 : 0] s_axi_mm_p_2_rresp,
+    input wire  s_axi_mm_p_2_rlast,
+    input wire [C_S_AXI_MM_P_2_RUSER_WIDTH-1 : 0] s_axi_mm_p_2_ruser,
+    input wire  s_axi_mm_p_2_rvalid,
+    input wire  s_axi_mm_p_2_rready,
+
+
+    //input wire  s_axi_mm_p_3_aclk,
+    //input wire  s_axi_mm_p_3_aresetn,
+	input wire [C_S_AXI_MM_P_3_ID_WIDTH-1 : 0] s_axi_mm_p_3_awid,
+    input wire [C_S_AXI_MM_P_3_ADDR_WIDTH-1 : 0] s_axi_mm_p_3_awaddr,
+    input wire [7 : 0] s_axi_mm_p_3_awlen,
+    input wire [2 : 0] s_axi_mm_p_3_awsize,
+    input wire [1 : 0] s_axi_mm_p_3_awburst,
+    input wire  s_axi_mm_p_3_awlock,
+    input wire [3 : 0] s_axi_mm_p_3_awcache,
+    input wire [2 : 0] s_axi_mm_p_3_awprot,
+    input wire [3 : 0] s_axi_mm_p_3_awqos,
+    input wire [3 : 0] s_axi_mm_p_3_awregion,
+    input wire [C_S_AXI_MM_P_3_AWUSER_WIDTH-1 : 0] s_axi_mm_p_3_awuser,
+    input wire  s_axi_mm_p_3_awvalid,
+    input wire  s_axi_mm_p_3_awready,
+    input wire [C_S_AXI_MM_P_3_DATA_WIDTH-1 : 0] s_axi_mm_p_3_wdata,
+    input wire [(C_S_AXI_MM_P_3_DATA_WIDTH/8)-1 : 0] s_axi_mm_p_3_wstrb,
+    input wire  s_axi_mm_p_3_wlast,
+    input wire [C_S_AXI_MM_P_3_WUSER_WIDTH-1 : 0] s_axi_mm_p_3_wuser,
+    input wire  s_axi_mm_p_3_wvalid,
+    input wire  s_axi_mm_p_3_wready,
+    input wire [C_S_AXI_MM_P_3_ID_WIDTH-1 : 0] s_axi_mm_p_3_bid,
+    input wire [1 : 0] s_axi_mm_p_3_bresp,
+    input wire [C_S_AXI_MM_P_3_BUSER_WIDTH-1 : 0] s_axi_mm_p_3_buser,
+    input wire  s_axi_mm_p_3_bvalid,
+    input wire  s_axi_mm_p_3_bready,
+    input wire [C_S_AXI_MM_P_3_ID_WIDTH-1 : 0] s_axi_mm_p_3_arid,
+    input wire [C_S_AXI_MM_P_3_ADDR_WIDTH-1 : 0] s_axi_mm_p_3_araddr,
+    input wire [7 : 0] s_axi_mm_p_3_arlen,
+    input wire [2 : 0] s_axi_mm_p_3_arsize,
+    input wire [1 : 0] s_axi_mm_p_3_arburst,
+    input wire  s_axi_mm_p_3_arlock,
+    input wire [3 : 0] s_axi_mm_p_3_arcache,
+    input wire [2 : 0] s_axi_mm_p_3_arprot,
+    input wire [3 : 0] s_axi_mm_p_3_arqos,
+    input wire [3 : 0] s_axi_mm_p_3_arregion,
+    input wire [C_S_AXI_MM_P_3_ARUSER_WIDTH-1 : 0] s_axi_mm_p_3_aruser,
+    input wire  s_axi_mm_p_3_arvalid,
+    input wire  s_axi_mm_p_3_arready,
+    input wire [C_S_AXI_MM_P_3_ID_WIDTH-1 : 0] s_axi_mm_p_3_rid,
+    input wire [C_S_AXI_MM_P_3_DATA_WIDTH-1 : 0] s_axi_mm_p_3_rdata,
+    input wire [1 : 0] s_axi_mm_p_3_rresp,
+    input wire  s_axi_mm_p_3_rlast,
+    input wire [C_S_AXI_MM_P_3_RUSER_WIDTH-1 : 0] s_axi_mm_p_3_ruser,
+    input wire  s_axi_mm_p_3_rvalid,
+    input wire  s_axi_mm_p_3_rready,
+	
+	
+	
+	// Ports of Axi Master Bus Interface M_AXI_MM_0
+    //input wire  m_axi_mm_0_aclk,
+    //input wire  m_axi_mm_0_aresetn,
+    output wire [C_M_AXI_MM_0_ID_WIDTH-1 : 0] m_axi_mm_0_awid,
+    output wire [C_M_AXI_MM_0_ADDR_WIDTH-1 : 0] m_axi_mm_0_awaddr,
+    output wire [7 : 0] m_axi_mm_0_awlen,
+    output wire [2 : 0] m_axi_mm_0_awsize,
+    output wire [1 : 0] m_axi_mm_0_awburst,
+    output wire  m_axi_mm_0_awlock,
+    output wire [3 : 0] m_axi_mm_0_awcache,
+    output wire [2 : 0] m_axi_mm_0_awprot,
+    output wire [3 : 0] m_axi_mm_0_awqos,
+    output wire [C_M_AXI_MM_0_AWUSER_WIDTH-1 : 0] m_axi_mm_0_awuser,
+    output wire  m_axi_mm_0_awvalid,
+    input wire  m_axi_mm_0_awready,
+    output wire [C_M_AXI_MM_0_DATA_WIDTH-1 : 0] m_axi_mm_0_wdata,
+    output wire [C_M_AXI_MM_0_DATA_WIDTH/8-1 : 0] m_axi_mm_0_wstrb,
+    output wire  m_axi_mm_0_wlast,
+    output wire [C_M_AXI_MM_0_WUSER_WIDTH-1 : 0] m_axi_mm_0_wuser,
+    output wire  m_axi_mm_0_wvalid,
+    input wire  m_axi_mm_0_wready,
+    input wire [C_M_AXI_MM_0_ID_WIDTH-1 : 0] m_axi_mm_0_bid,
+    input wire [1 : 0] m_axi_mm_0_bresp,
+    input wire [C_M_AXI_MM_0_BUSER_WIDTH-1 : 0] m_axi_mm_0_buser,
+    input wire  m_axi_mm_0_bvalid,
+    output wire  m_axi_mm_0_bready,
+    output wire [C_M_AXI_MM_0_ID_WIDTH-1 : 0] m_axi_mm_0_arid,
+    output wire [C_M_AXI_MM_0_ADDR_WIDTH-1 : 0] m_axi_mm_0_araddr,
+    output wire [7 : 0] m_axi_mm_0_arlen,
+    output wire [2 : 0] m_axi_mm_0_arsize,
+    output wire [1 : 0] m_axi_mm_0_arburst,
+    output wire  m_axi_mm_0_arlock,
+    output wire [3 : 0] m_axi_mm_0_arcache,
+    output wire [2 : 0] m_axi_mm_0_arprot,
+    output wire [3 : 0] m_axi_mm_0_arqos,
+    output wire [C_M_AXI_MM_0_ARUSER_WIDTH-1 : 0] m_axi_mm_0_aruser,
+    output wire  m_axi_mm_0_arvalid,
+    input wire  m_axi_mm_0_arready,
+    input wire [C_M_AXI_MM_0_ID_WIDTH-1 : 0] m_axi_mm_0_rid,
+    input wire [C_M_AXI_MM_0_DATA_WIDTH-1 : 0] m_axi_mm_0_rdata,
+    input wire [1 : 0] m_axi_mm_0_rresp,
+    input wire  m_axi_mm_0_rlast,
+    input wire [C_M_AXI_MM_0_RUSER_WIDTH-1 : 0] m_axi_mm_0_ruser,
+    input wire  m_axi_mm_0_rvalid,
+    output wire  m_axi_mm_0_rready,
+
+    // Ports of Axi Master Bus Interface M_AXI_MM_1
+    //input wire  m_axi_mm_1_aclk,
+    //input wire  m_axi_mm_1_aresetn,
+    output wire [C_M_AXI_MM_1_ID_WIDTH-1 : 0] m_axi_mm_1_awid,
+    output wire [C_M_AXI_MM_1_ADDR_WIDTH-1 : 0] m_axi_mm_1_awaddr,
+    output wire [7 : 0] m_axi_mm_1_awlen,
+    output wire [2 : 0] m_axi_mm_1_awsize,
+    output wire [1 : 0] m_axi_mm_1_awburst,
+    output wire  m_axi_mm_1_awlock,
+    output wire [3 : 0] m_axi_mm_1_awcache,
+    output wire [2 : 0] m_axi_mm_1_awprot,
+    output wire [3 : 0] m_axi_mm_1_awqos,
+    output wire [C_M_AXI_MM_1_AWUSER_WIDTH-1 : 0] m_axi_mm_1_awuser,
+    output wire  m_axi_mm_1_awvalid,
+    input wire  m_axi_mm_1_awready,
+    output wire [C_M_AXI_MM_1_DATA_WIDTH-1 : 0] m_axi_mm_1_wdata,
+    output wire [C_M_AXI_MM_1_DATA_WIDTH/8-1 : 0] m_axi_mm_1_wstrb,
+    output wire  m_axi_mm_1_wlast,
+    output wire [C_M_AXI_MM_1_WUSER_WIDTH-1 : 0] m_axi_mm_1_wuser,
+    output wire  m_axi_mm_1_wvalid,
+    input wire  m_axi_mm_1_wready,
+    input wire [C_M_AXI_MM_1_ID_WIDTH-1 : 0] m_axi_mm_1_bid,
+    input wire [1 : 0] m_axi_mm_1_bresp,
+    input wire [C_M_AXI_MM_1_BUSER_WIDTH-1 : 0] m_axi_mm_1_buser,
+    input wire  m_axi_mm_1_bvalid,
+    output wire  m_axi_mm_1_bready,
+    output wire [C_M_AXI_MM_1_ID_WIDTH-1 : 0] m_axi_mm_1_arid,
+    output wire [C_M_AXI_MM_1_ADDR_WIDTH-1 : 0] m_axi_mm_1_araddr,
+    output wire [7 : 0] m_axi_mm_1_arlen,
+    output wire [2 : 0] m_axi_mm_1_arsize,
+    output wire [1 : 0] m_axi_mm_1_arburst,
+    output wire  m_axi_mm_1_arlock,
+    output wire [3 : 0] m_axi_mm_1_arcache,
+    output wire [2 : 0] m_axi_mm_1_arprot,
+    output wire [3 : 0] m_axi_mm_1_arqos,
+    output wire [C_M_AXI_MM_1_ARUSER_WIDTH-1 : 0] m_axi_mm_1_aruser,
+    output wire  m_axi_mm_1_arvalid,
+    input wire  m_axi_mm_1_arready,
+    input wire [C_M_AXI_MM_1_ID_WIDTH-1 : 0] m_axi_mm_1_rid,
+    input wire [C_M_AXI_MM_1_DATA_WIDTH-1 : 0] m_axi_mm_1_rdata,
+    input wire [1 : 0] m_axi_mm_1_rresp,
+    input wire  m_axi_mm_1_rlast,
+    input wire [C_M_AXI_MM_1_RUSER_WIDTH-1 : 0] m_axi_mm_1_ruser,
+    input wire  m_axi_mm_1_rvalid,
+    output wire  m_axi_mm_1_rready,
+
+    // Ports of Axi Slave Bus Interface S_AXI_MM_0
+    //(* mark_debug = "true" *) input wire  s_axi_mm_0_aclk,
+    //(* mark_debug = "true" *) input wire  s_axi_mm_0_aresetn,
+    input wire [C_S_AXI_MM_0_ID_WIDTH-1 : 0] s_axi_mm_0_awid,
+    input wire [C_S_AXI_MM_0_ADDR_WIDTH-1 : 0] s_axi_mm_0_awaddr,
+    input wire [7 : 0] s_axi_mm_0_awlen,
+    input wire [2 : 0] s_axi_mm_0_awsize,
+    input wire [1 : 0] s_axi_mm_0_awburst,
+    input wire  s_axi_mm_0_awlock,
+    input wire [3 : 0] s_axi_mm_0_awcache,
+    input wire [2 : 0] s_axi_mm_0_awprot,
+    input wire [3 : 0] s_axi_mm_0_awqos,
+    input wire [3 : 0] s_axi_mm_0_awregion,
+    input wire [C_S_AXI_MM_0_AWUSER_WIDTH-1 : 0] s_axi_mm_0_awuser,
+    input wire  s_axi_mm_0_awvalid,
+    output wire  s_axi_mm_0_awready,
+    input wire [C_S_AXI_MM_0_DATA_WIDTH-1 : 0] s_axi_mm_0_wdata,
+    input wire [(C_S_AXI_MM_0_DATA_WIDTH/8)-1 : 0] s_axi_mm_0_wstrb,
+    input wire  s_axi_mm_0_wlast,
+    input wire [C_S_AXI_MM_0_WUSER_WIDTH-1 : 0] s_axi_mm_0_wuser,
+    input wire  s_axi_mm_0_wvalid,
+    output wire  s_axi_mm_0_wready,
+    output wire [C_S_AXI_MM_0_ID_WIDTH-1 : 0] s_axi_mm_0_bid,
+    output wire [1 : 0] s_axi_mm_0_bresp,
+    output wire [C_S_AXI_MM_0_BUSER_WIDTH-1 : 0] s_axi_mm_0_buser,
+    output wire  s_axi_mm_0_bvalid,
+    input wire  s_axi_mm_0_bready,
+    input wire [C_S_AXI_MM_0_ID_WIDTH-1 : 0] s_axi_mm_0_arid,
+    input wire [C_S_AXI_MM_0_ADDR_WIDTH-1 : 0] s_axi_mm_0_araddr,
+    input wire [7 : 0] s_axi_mm_0_arlen,
+    input wire [2 : 0] s_axi_mm_0_arsize,
+    input wire [1 : 0] s_axi_mm_0_arburst,
+    input wire  s_axi_mm_0_arlock,
+    input wire [3 : 0] s_axi_mm_0_arcache,
+    input wire [2 : 0] s_axi_mm_0_arprot,
+    input wire [3 : 0] s_axi_mm_0_arqos,
+    input wire [3 : 0] s_axi_mm_0_arregion,
+    input wire [C_S_AXI_MM_0_ARUSER_WIDTH-1 : 0] s_axi_mm_0_aruser,
+    input wire  s_axi_mm_0_arvalid,
+    output wire  s_axi_mm_0_arready,
+    output wire [C_S_AXI_MM_0_ID_WIDTH-1 : 0] s_axi_mm_0_rid,
+    output wire [C_S_AXI_MM_0_DATA_WIDTH-1 : 0] s_axi_mm_0_rdata,
+    output wire [1 : 0] s_axi_mm_0_rresp,
+    output wire  s_axi_mm_0_rlast,
+    output wire [C_S_AXI_MM_0_RUSER_WIDTH-1 : 0] s_axi_mm_0_ruser,
+    output wire  s_axi_mm_0_rvalid,
+    input wire  s_axi_mm_0_rready,
+
+    // Ports of Axi Slave Bus Interface S_AXI_MM_1
+    //(* mark_debug = "true" *) input wire  s_axi_mm_1_aclk,
+    //(* mark_debug = "true" *) input wire  s_axi_mm_1_aresetn,
+    input wire [C_S_AXI_MM_1_ID_WIDTH-1 : 0] s_axi_mm_1_awid,
+    input wire [C_S_AXI_MM_1_ADDR_WIDTH-1 : 0] s_axi_mm_1_awaddr,
+    input wire [7 : 0] s_axi_mm_1_awlen,
+    input wire [2 : 0] s_axi_mm_1_awsize,
+    input wire [1 : 0] s_axi_mm_1_awburst,
+    input wire  s_axi_mm_1_awlock,
+    input wire [3 : 0] s_axi_mm_1_awcache,
+    input wire [2 : 0] s_axi_mm_1_awprot,
+    input wire [3 : 0] s_axi_mm_1_awqos,
+    input wire [3 : 0] s_axi_mm_1_awregion,
+    input wire [C_S_AXI_MM_1_AWUSER_WIDTH-1 : 0] s_axi_mm_1_awuser,
+    input wire  s_axi_mm_1_awvalid,
+    output wire  s_axi_mm_1_awready,
+    input wire [C_S_AXI_MM_1_DATA_WIDTH-1 : 0] s_axi_mm_1_wdata,
+    input wire [(C_S_AXI_MM_1_DATA_WIDTH/8)-1 : 0] s_axi_mm_1_wstrb,
+    input wire  s_axi_mm_1_wlast,
+    input wire [C_S_AXI_MM_1_WUSER_WIDTH-1 : 0] s_axi_mm_1_wuser,
+    input wire  s_axi_mm_1_wvalid,
+    output wire  s_axi_mm_1_wready,
+    output wire [C_S_AXI_MM_1_ID_WIDTH-1 : 0] s_axi_mm_1_bid,
+    output wire [1 : 0] s_axi_mm_1_bresp,
+    output wire [C_S_AXI_MM_1_BUSER_WIDTH-1 : 0] s_axi_mm_1_buser,
+    output wire  s_axi_mm_1_bvalid,
+    input wire  s_axi_mm_1_bready,
+    input wire [C_S_AXI_MM_1_ID_WIDTH-1 : 0] s_axi_mm_1_arid,
+    input wire [C_S_AXI_MM_1_ADDR_WIDTH-1 : 0] s_axi_mm_1_araddr,
+    input wire [7 : 0] s_axi_mm_1_arlen,
+    input wire [2 : 0] s_axi_mm_1_arsize,
+    input wire [1 : 0] s_axi_mm_1_arburst,
+    input wire  s_axi_mm_1_arlock,
+    input wire [3 : 0] s_axi_mm_1_arcache,
+    input wire [2 : 0] s_axi_mm_1_arprot,
+    input wire [3 : 0] s_axi_mm_1_arqos,
+    input wire [3 : 0] s_axi_mm_1_arregion,
+    input wire [C_S_AXI_MM_1_ARUSER_WIDTH-1 : 0] s_axi_mm_1_aruser,
+    input wire  s_axi_mm_1_arvalid,
+    output wire  s_axi_mm_1_arready,
+    output wire [C_S_AXI_MM_1_ID_WIDTH-1 : 0] s_axi_mm_1_rid,
+    output wire [C_S_AXI_MM_1_DATA_WIDTH-1 : 0] s_axi_mm_1_rdata,
+    output wire [1 : 0] s_axi_mm_1_rresp,
+    output wire  s_axi_mm_1_rlast,
+    output wire [C_S_AXI_MM_1_RUSER_WIDTH-1 : 0] s_axi_mm_1_ruser,
+    output wire  s_axi_mm_1_rvalid,
+    input wire  s_axi_mm_1_rready,
+
+    // Interrupt
+    output wire  host_irq
+    );
+
+
+   // Declaration
+   // -------------------------------------
+   //localparam integer C_PRODUCER_PORT = C_DEC_ENC_N == 0 ? C_VIDEO_CHAN : 2;  //Encoder (1,2,3,4), Decoder ( always 2 VCU ports)
+   localparam integer C_PRODUCER_PORT = PRODUCER_PORTS;  //Encoder (1,2,3,4), Decoder ( always 2 VCU ports)
+   //localparam integer C_CONSUMER_PORT = C_DEC_ENC_N == 0 ? 2: C_VIDEO_CHAN;   //Encoder (always 2 VCU ports), Decoder (1,2)
+   localparam integer C_CONSUMER_PORT = CONSUMER_PORTS;   //Encoder (always 2 VCU ports), Decoder (1,2)
+   localparam C_CONSUMER_CHAN_PER_PORT = C_DEC_ENC_N == 0 ? 2 : 1;
+   localparam C_CONSUMER_CHAN = C_CONSUMER_PORT * C_CONSUMER_CHAN_PER_PORT;
+
+   localparam C_FRMBUF_ADDR_WIDTH = 44;
+
+    wire  s_axi_mm_p_0_aclk = s_axi_mm_p_aclk;
+    wire  s_axi_mm_p_0_aresetn = s_axi_mm_p_aresetn;
+    wire  s_axi_mm_p_1_aclk = s_axi_mm_p_aclk;
+    wire  s_axi_mm_p_1_aresetn= s_axi_mm_p_aresetn;
+    wire  s_axi_mm_p_2_aclk = s_axi_mm_p_aclk;
+    wire  s_axi_mm_p_2_aresetn = s_axi_mm_p_aresetn;
+    wire  s_axi_mm_p_3_aclk = s_axi_mm_p_aclk;
+    wire  s_axi_mm_p_3_aresetn = s_axi_mm_p_aresetn;
+    wire  m_axi_mm_0_aclk = m_axi_mm_aclk;
+    wire  m_axi_mm_0_aresetn= m_axi_mm_aresetn;
+    wire  m_axi_mm_1_aclk= m_axi_mm_aclk;
+    wire  m_axi_mm_1_aresetn= m_axi_mm_aresetn;
+    wire  s_axi_mm_0_aclk= s_axi_mm_aclk;
+    wire  s_axi_mm_0_aresetn= s_axi_mm_aresetn;
+    wire  s_axi_mm_1_aclk= s_axi_mm_aclk;
+    wire  s_axi_mm_1_aresetn= s_axi_mm_aresetn; 
+   
+   wire [C_VIDEO_CHAN-1:0] en;
+   wire [C_VIDEO_CHAN-1:0] prod_err_syncfail;
+   wire [C_VIDEO_CHAN-1:0] prod_err_wdt;
+   wire [C_VIDEO_CHAN-1:0] cons_err_syncfail;
+   wire [C_VIDEO_CHAN-1:0] cons_err_wdt;
+   reg  [C_VIDEO_CHAN-1:0] cons_err_syncfail_rg;
+   reg  [C_VIDEO_CHAN-1:0] cons_err_wdt_rg;
+   reg  [C_VIDEO_CHAN-1:0] prod_err_syncfail_rg;
+   reg  [C_VIDEO_CHAN-1:0] prod_err_wdt_rg;
+
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_luma_frmbuf_start_addr;
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_luma_frmbuf_end_addr;
+   wire [32*C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_margin;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_valid_pulse;
+   
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_chroma_frmbuf_start_addr;
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_chroma_frmbuf_end_addr;
+   wire [32*C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_margin;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_valid_pulse;
+
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_next_0;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_done_0;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_next_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_done_0_rg;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c0_addr_done_0;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c1_addr_done_0;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c2_addr_done_0;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c3_addr_done_0;//####
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_luma_frmbuf_addr_outthres_0;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_outthres_valid_pulse_0;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_next_0;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_done_0;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_next_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_done_0_rg;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c0_addr_done_0;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c1_addr_done_0;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c2_addr_done_0;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c3_addr_done_0;//####
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_chroma_frmbuf_addr_outthres_0;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_outthres_valid_pulse_0;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_timeout_0;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_timeout_0;
+   //wire [C_VIDEO_CHAN-1:0] 		       prod_luma_outofrange_0;
+   //wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_outofrange_0;
+   wire [C_VIDEO_CHAN-1:0]                     prod_outofrange_0;
+
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_next_1;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_done_1;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_next_1_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_done_1_rg;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c0_addr_done_1;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c1_addr_done_1;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c2_addr_done_1;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c3_addr_done_1;//####
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_luma_frmbuf_addr_outthres_1;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_outthres_valid_pulse_1;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_next_1;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_done_1;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_next_1_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_done_1_rg;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c0_addr_done_1;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c1_addr_done_1;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c2_addr_done_1;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c3_addr_done_1;//####
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_chroma_frmbuf_addr_outthres_1;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_outthres_valid_pulse_1;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_timeout_1;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_timeout_1;
+   //wire [C_VIDEO_CHAN-1:0] 		       prod_luma_outofrange_1;
+   //wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_outofrange_1;
+   wire [C_VIDEO_CHAN-1:0]                     prod_outofrange_1;
+
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_next_2;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_done_2;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_next_2_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_done_2_rg;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c0_addr_done_2;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c1_addr_done_2;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c2_addr_done_2;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c3_addr_done_2;//####
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_luma_frmbuf_addr_outthres_2;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_outthres_valid_pulse_2;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_next_2;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_done_2;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_next_2_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_done_2_rg;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c0_addr_done_2;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c1_addr_done_2;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c2_addr_done_2;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c3_addr_done_2;//####
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_chroma_frmbuf_addr_outthres_2;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_outthres_valid_pulse_2;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_timeout_2;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_timeout_2;
+   //wire [C_VIDEO_CHAN-1:0] 		       prod_luma_outofrange_2;
+   //wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_outofrange_2;
+   wire [C_VIDEO_CHAN-1:0]                     prod_outofrange_2;
+   
+   //####Addition of Buff id Signals
+   wire [2*C_VIDEO_CHAN-1:0] 			  prod_luma_buf_id;  //####Additon of Buffer id signals 
+   wire [2*C_VIDEO_CHAN-1:0] 			  prod_chroma_buf_id;//####Additon of Buffer id signals 
+   wire [2*C_VIDEO_CHAN-1:0] 			  cons_luma_buf_id;  //####Additon of Buffer id signals 
+   wire [2*C_VIDEO_CHAN-1:0] 			  cons_chroma_buf_id;//####Additon of Buffer id signals 
+
+
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_next_3;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_done_3;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_next_3_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_done_3_rg;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c0_addr_done_3;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c1_addr_done_3;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c2_addr_done_3;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_c3_addr_done_3;//####
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_luma_frmbuf_addr_outthres_3;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_outthres_valid_pulse_3;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_next_3;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_done_3;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_next_3_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_done_3_rg;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c0_addr_done_3;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c1_addr_done_3;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c2_addr_done_3;//####
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_c3_addr_done_3;//####
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] prod_chroma_frmbuf_addr_outthres_3;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_outthres_valid_pulse_3;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_luma_timeout_3;
+   wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_timeout_3;
+   //wire [C_VIDEO_CHAN-1:0] 		       prod_luma_outofrange_3;
+   //wire [C_VIDEO_CHAN-1:0] 		       prod_chroma_outofrange_3;
+   wire [C_VIDEO_CHAN-1:0]                     prod_outofrange_3;
+   
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] cons_luma_frmbuf_start_addr;
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] cons_luma_frmbuf_end_addr;
+   wire [32*C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_margin;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_valid_pulse;
+
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] cons_chroma_frmbuf_start_addr;
+   wire [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0] cons_chroma_frmbuf_end_addr;
+   wire [32*C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_margin;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_valid_pulse;
+
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_next_0;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_next_1;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_done_0;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_done_1;
+
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_next_0;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_next_1;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_done_0;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_done_1;
+
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_outofrange_0;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_outofrange_0;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_timeout_0;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_timeout_0;
+   
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_outofrange_1;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_outofrange_1;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_luma_timeout_1;
+   wire [C_VIDEO_CHAN-1:0] 		       cons_chroma_timeout_1;
+
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_next_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_next_1_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_done_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_luma_frmbuf_addr_done_1_rg;
+
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_next_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_next_1_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_done_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_chroma_frmbuf_addr_done_1_rg;
+
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_luma_outofrange_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_chroma_outofrange_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_luma_timeout_0_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_chroma_timeout_0_rg;
+ 
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_luma_outofrange_1_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_chroma_outofrange_1_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_luma_timeout_1_rg;
+   reg  [C_VIDEO_CHAN-1:0] 		       cons_chroma_timeout_1_rg;
+ 
+
+   reg [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]  prod_luma_frmbuf_addr_outthres;
+   reg [C_VIDEO_CHAN-1:0] 		       prod_luma_frmbuf_addr_outthres_valid_pulse;
+   reg [C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]  prod_chroma_frmbuf_addr_outthres;
+   reg [C_VIDEO_CHAN-1:0] 		       prod_chroma_frmbuf_addr_outthres_valid_pulse;
+ 
+   wire [31:0]                   luma_c0_offset;
+   wire [31:0]                   luma_c1_offset;
+   wire [31:0]                   luma_c2_offset;
+   wire [31:0]                   luma_c3_offset;
+   wire [31:0]                   chroma_c0_offset;
+   wire [31:0]                   chroma_c1_offset;
+   wire [31:0]                   chroma_c2_offset;
+   wire [31:0]                   chroma_c3_offset;
+   
+   wire [3:0] 			 m_axi_arid_0;      
+   wire [63:0] 			 m_axi_araddr_0;    
+   wire [7:0] 			 m_axi_arlen_0;     
+   wire [2:0] 			 m_axi_arsize_0;    
+   wire [1:0] 			 m_axi_arburst_0;   
+   wire [0:0] 			 m_axi_arlock_0;    
+   wire [3:0] 			 m_axi_arcache_0;   
+   wire [2:0] 			 m_axi_arprot_0;    
+   wire [3:0] 			 m_axi_arregion_0;  
+   wire [3:0] 			 m_axi_arqos_0;     
+   wire 			 m_axi_arvalid_0;   
+   wire 			 m_axi_arready_0;   
+   wire [3:0] 			 m_axi_rid_0;       
+   wire [127:0] 		 m_axi_rdata_0;     
+   wire [1:0] 			 m_axi_rresp_0;     
+   wire 			 m_axi_rlast_0;     
+   wire 			 m_axi_rvalid_0;    
+   wire 			 m_axi_rready_0;    
+   
+   wire [3:0] 			 m_axi_awid_0;      
+   wire [63:0] 			 m_axi_awaddr_0;    
+   wire [7:0] 			 m_axi_awlen_0;     
+   wire [2:0] 			 m_axi_awsize_0;    
+   wire [1:0] 			 m_axi_awburst_0;   
+   wire 			 m_axi_awlock_0;    
+   wire [3:0] 			 m_axi_awcache_0;   
+   wire [2:0] 			 m_axi_awprot_0;    
+   wire [3:0] 			 m_axi_awregion_0;  
+   wire [3:0] 			 m_axi_awqos_0;     
+   wire 			 m_axi_awvalid_0;   
+   wire 			 m_axi_awready_0;   
+   wire [127:0] 		 m_axi_wdata_0;     
+   wire [15:0] 			 m_axi_wstrb_0;     
+   wire 			 m_axi_wlast_0;     
+   wire 			 m_axi_wvalid_0;    
+   wire 			 m_axi_wready_0;    
+   wire [3:0] 			 m_axi_bid_0;       
+   wire [1:0] 			 m_axi_bresp_0;     
+   wire 			 m_axi_bvalid_0;    
+   wire 			 m_axi_bready_0;    
+
+   wire [3:0] 			 m_axi_arid_1;      
+   wire [63:0] 			 m_axi_araddr_1;    
+   wire [7:0] 			 m_axi_arlen_1;     
+   wire [2:0] 			 m_axi_arsize_1;    
+   wire [1:0] 			 m_axi_arburst_1;   
+   wire [0:0] 			 m_axi_arlock_1;    
+   wire [3:0] 			 m_axi_arcache_1;   
+   wire [2:0] 			 m_axi_arprot_1;    
+   wire [3:0] 			 m_axi_arregion_1;  
+   wire [3:0] 			 m_axi_arqos_1;     
+   wire 			 m_axi_arvalid_1;   
+   wire 			 m_axi_arready_1;   
+   wire [3:0] 			 m_axi_rid_1;       
+   wire [127:0] 		 m_axi_rdata_1;     
+   wire [1:0] 			 m_axi_rresp_1;     
+   wire 			 m_axi_rlast_1;     
+   wire 			 m_axi_rvalid_1;    
+   wire 			 m_axi_rready_1;    
+   
+   wire [3:0] 			 m_axi_awid_1;      
+   wire [63:0] 			 m_axi_awaddr_1;    
+   wire [7:0] 			 m_axi_awlen_1;     
+   wire [2:0] 			 m_axi_awsize_1;    
+   wire [1:0] 			 m_axi_awburst_1;   
+   wire 			 m_axi_awlock_1;    
+   wire [3:0] 			 m_axi_awcache_1;   
+   wire [2:0] 			 m_axi_awprot_1;    
+   wire [3:0] 			 m_axi_awregion_1;  
+   wire [3:0] 			 m_axi_awqos_1;     
+   wire 			 m_axi_awvalid_1;   
+   wire 			 m_axi_awready_1;   
+   wire [127:0] 		 m_axi_wdata_1;     
+   wire [15:0] 			 m_axi_wstrb_1;     
+   wire 			 m_axi_wlast_1;     
+   wire 			 m_axi_wvalid_1;    
+   wire 			 m_axi_wready_1;    
+   wire [3:0] 			 m_axi_bid_1;       
+   wire [1:0] 			 m_axi_bresp_1;     
+   wire 			 m_axi_bvalid_1;    
+   wire 			 m_axi_bready_1;    
+
+   wire 			 producer_aclk = s_axi_mm_p_0_aclk;
+   wire 			 producer_aresetn = s_axi_mm_p_0_aresetn;
+   
+   wire 			 consumer_aclk = s_axi_mm_0_aclk;
+   wire 			 consumer_aresetn = s_axi_mm_0_aresetn;
+
+   wire  [C_VIDEO_CHAN-1:0]      S_AXI_SW_ARESET;
+   wire  [C_VIDEO_CHAN-1:0]      buf_rd_cnt_en;
+   wire  [C_VIDEO_CHAN*C_RD_BUF_CNT_WIDTH-1:0] cons_luma_buf_rd_cnt0;
+   wire  [C_VIDEO_CHAN*C_RD_BUF_CNT_WIDTH-1:0] cons_luma_buf_rd_cnt1;
+   wire  [C_VIDEO_CHAN*C_RD_BUF_CNT_WIDTH-1:0] cons_chroma_buf_rd_cnt0;
+   wire  [C_VIDEO_CHAN*C_RD_BUF_CNT_WIDTH-1:0] cons_chroma_buf_rd_cnt1;
+
+   
+   // Instantiation of Axi Bus Interface S_AXI_CTRL
+   syn_ip_v1_0_S_AXI_CTRL # 
+     (
+      .C_NUM_CHAN (C_VIDEO_CHAN),
+      .C_DEC_ENC_N (C_DEC_ENC_N),
+      .C_FRMBUF_ADDR_WIDTH (C_FRMBUF_ADDR_WIDTH),
+      .C_S_AXI_DATA_WIDTH(C_S_AXI_CTRL_DATA_WIDTH),
+      .C_S_AXI_ADDR_WIDTH(C_S_AXI_CTRL_ADDR_WIDTH)
+      ) syn_ip_v1_0_S_AXI_CTRL_inst 
+       (
+	.en (en[C_VIDEO_CHAN-1:0]),
+	.irq (host_irq),
+        .S_AXI_SW_ARESET (S_AXI_SW_ARESET),
+        .buf_rd_cnt_en   (buf_rd_cnt_en),
+
+	.prod_luma_frmbuf_start_addr (prod_luma_frmbuf_start_addr[C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]),
+	.prod_luma_frmbuf_end_addr (prod_luma_frmbuf_end_addr[C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]),
+	.prod_luma_frmbuf_margin (prod_luma_frmbuf_margin[32*C_VIDEO_CHAN-1:0]),
+	.prod_luma_frmbuf_addr_valid_pulse (prod_luma_frmbuf_addr_valid_pulse[C_VIDEO_CHAN-1:0]),
+
+	.prod_chroma_frmbuf_start_addr (prod_chroma_frmbuf_start_addr[C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]),
+	.prod_chroma_frmbuf_end_addr (prod_chroma_frmbuf_end_addr[C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]),
+	.prod_chroma_frmbuf_margin (prod_chroma_frmbuf_margin[32*C_VIDEO_CHAN-1:0]),
+	.prod_chroma_frmbuf_addr_valid_pulse (prod_chroma_frmbuf_addr_valid_pulse[C_VIDEO_CHAN-1:0]),
+	
+	.cons_luma_frmbuf_start_addr (cons_luma_frmbuf_start_addr[C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]),
+	.cons_luma_frmbuf_end_addr (cons_luma_frmbuf_end_addr[C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]),
+	.cons_luma_frmbuf_margin (cons_luma_frmbuf_margin[32*C_VIDEO_CHAN-1:0]),
+	.cons_luma_frmbuf_addr_valid_pulse (cons_luma_frmbuf_addr_valid_pulse[C_VIDEO_CHAN-1:0]),
+
+
+	.cons_chroma_frmbuf_start_addr (cons_chroma_frmbuf_start_addr[C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]),
+	.cons_chroma_frmbuf_end_addr (cons_chroma_frmbuf_end_addr[C_FRMBUF_ADDR_WIDTH*C_VIDEO_CHAN-1:0]),
+	.cons_chroma_frmbuf_margin (cons_chroma_frmbuf_margin[32*C_VIDEO_CHAN-1:0]),
+	.cons_chroma_frmbuf_addr_valid_pulse (cons_chroma_frmbuf_addr_valid_pulse[C_VIDEO_CHAN-1:0]),
+
+	.prod_luma_buf_id(prod_luma_buf_id),	//####Addition of buffer id signal
+	.prod_chroma_buf_id(prod_chroma_buf_id),//####Addition of buffer id signal
+	.cons_luma_buf_id(cons_luma_buf_id),	//####Addition of buffer id signal
+	.cons_chroma_buf_id(cons_chroma_buf_id),//####Addition of buffer id signal
+	
+
+	.producer_aclk (producer_aclk),
+	.producer_aresetn (producer_aresetn),
+	.prod_err_syncfail (prod_err_syncfail_rg[C_VIDEO_CHAN-1:0]),
+	.prod_err_wdt (prod_err_wdt_rg[C_VIDEO_CHAN-1:0]),
+	.prod_luma_frmbuf_addr_next (  prod_luma_frmbuf_addr_next_0_rg
+				     | prod_luma_frmbuf_addr_next_1_rg
+				     | prod_luma_frmbuf_addr_next_2_rg
+				     | prod_luma_frmbuf_addr_next_3_rg),
+	
+	.prod_chroma_frmbuf_addr_next (  prod_chroma_frmbuf_addr_next_0_rg
+				       | prod_chroma_frmbuf_addr_next_1_rg
+				       | prod_chroma_frmbuf_addr_next_2_rg
+				       | prod_chroma_frmbuf_addr_next_3_rg),
+     
+        .prod_luma_frmbuf_addr_done   (  prod_luma_frmbuf_addr_done_0_rg
+                                       | prod_luma_frmbuf_addr_done_1_rg
+                                       | prod_luma_frmbuf_addr_done_2_rg
+                                       | prod_luma_frmbuf_addr_done_3_rg),
+	
+        .prod_chroma_frmbuf_addr_done (  prod_chroma_frmbuf_addr_done_0_rg
+                                       | prod_chroma_frmbuf_addr_done_1_rg
+                                       | prod_chroma_frmbuf_addr_done_2_rg
+                                       | prod_chroma_frmbuf_addr_done_3_rg),
+ 
+	.consumer_aclk (consumer_aclk),
+	.consumer_aresetn (consumer_aresetn),
+	.cons_err_syncfail (cons_err_syncfail_rg[C_VIDEO_CHAN-1:0]),
+	.cons_err_wdt (cons_err_wdt_rg[C_VIDEO_CHAN-1:0]),
+
+	.cons_luma_frmbuf_addr_next (cons_luma_frmbuf_addr_next_0_rg
+				     | cons_luma_frmbuf_addr_next_1_rg),
+	.cons_luma_frmbuf_addr_done (cons_luma_frmbuf_addr_done_0_rg
+				     | cons_luma_frmbuf_addr_done_1_rg),
+
+	.cons_chroma_frmbuf_addr_next (cons_chroma_frmbuf_addr_next_0
+				       | cons_chroma_frmbuf_addr_next_1),
+	.cons_chroma_frmbuf_addr_done (cons_chroma_frmbuf_addr_done_0
+				       | cons_chroma_frmbuf_addr_done_1),
+
+   	.luma_c0_offset          (luma_c0_offset   ),//#### Addition of offset signal 
+        .luma_c1_offset          (luma_c1_offset   ),//#### Addition of offset signal
+        .luma_c2_offset          (luma_c2_offset   ),//#### Addition of offset signal
+        .luma_c3_offset          (luma_c3_offset   ),//#### Addition of offset signal
+        .chroma_c0_offset        (chroma_c0_offset ),//#### Addition of offset signal
+        .chroma_c1_offset        (chroma_c1_offset ),//#### Addition of offset signal
+        .chroma_c2_offset        (chroma_c2_offset ),//#### Addition of offset signal
+        .chroma_c3_offset        (chroma_c3_offset ),//#### Addition of offset signal
+
+	.S_AXI_ACLK(s_axi_ctrl_aclk),
+	.S_AXI_ARESETN(s_axi_ctrl_aresetn),
+	.S_AXI_AWADDR(s_axi_ctrl_awaddr),
+	.S_AXI_AWPROT(s_axi_ctrl_awprot),
+	.S_AXI_AWVALID(s_axi_ctrl_awvalid),
+	.S_AXI_AWREADY(s_axi_ctrl_awready),
+	.S_AXI_WDATA(s_axi_ctrl_wdata),
+	.S_AXI_WSTRB(s_axi_ctrl_wstrb),
+	.S_AXI_WVALID(s_axi_ctrl_wvalid),
+	.S_AXI_WREADY(s_axi_ctrl_wready),
+	.S_AXI_BRESP(s_axi_ctrl_bresp),
+	.S_AXI_BVALID(s_axi_ctrl_bvalid),
+	.S_AXI_BREADY(s_axi_ctrl_bready),
+	.S_AXI_ARADDR(s_axi_ctrl_araddr),
+	.S_AXI_ARPROT(s_axi_ctrl_arprot),
+	.S_AXI_ARVALID(s_axi_ctrl_arvalid),
+	.S_AXI_ARREADY(s_axi_ctrl_arready),
+	.S_AXI_RDATA(s_axi_ctrl_rdata),
+	.S_AXI_RRESP(s_axi_ctrl_rresp),
+	.S_AXI_RVALID(s_axi_ctrl_rvalid),
+	.S_AXI_RREADY(s_axi_ctrl_rready)
+	);
+
+   // Instantiation of Axi Bus Interface S_AXI_MM_P
+   
+   syn_ip_v1_0_S_AXI_MM_P # 
+     (
+      .C_VIDEO_CHAN (C_VIDEO_CHAN),
+      .C_VIDEO_CHAN_ID (0),
+      .C_DEC_ENC_N     (C_DEC_ENC_N),
+      .C_RECONSTRUCTED_FRAME_DETECT (C_RECONSTRUCTED_FRAME_DETECT),
+      .C_TIMEOUT    (C_PRODUCER_TIMEOUT),
+       .C_BUF_CNT_WIDTH    (C_BUF_CNT_WIDTH),
+      .C_FRMBUF_ADDR_WIDTH (C_FRMBUF_ADDR_WIDTH),
+      .C_S_AXI_ID_WIDTH(C_S_AXI_MM_P_0_ID_WIDTH),
+      .C_S_AXI_DATA_WIDTH(C_S_AXI_MM_P_0_DATA_WIDTH),
+      .C_S_AXI_ADDR_WIDTH(C_S_AXI_MM_P_0_ADDR_WIDTH),
+      .C_S_AXI_AWUSER_WIDTH(C_S_AXI_MM_P_0_AWUSER_WIDTH),
+      .C_S_AXI_ARUSER_WIDTH(C_S_AXI_MM_P_0_ARUSER_WIDTH),
+      .C_S_AXI_WUSER_WIDTH(C_S_AXI_MM_P_0_WUSER_WIDTH),
+      .C_S_AXI_RUSER_WIDTH(C_S_AXI_MM_P_0_RUSER_WIDTH),
+      .C_S_AXI_BUSER_WIDTH(C_S_AXI_MM_P_0_BUSER_WIDTH)
+      ) syn_ip_v1_0_S_AXI_MM_P_0_inst 
+       (
+	.ctrl_aclk (s_axi_ctrl_aclk),
+	.ctrl_aresetn (s_axi_ctrl_aresetn),
+	.en (en),
+
+        .luma_buf_id (prod_luma_buf_id),
+        .chroma_buf_id (prod_chroma_buf_id),
+
+        .S_AXI_SW_ARESET (S_AXI_SW_ARESET[0]),
+	.luma_frmbuf_start_addr (prod_luma_frmbuf_start_addr),
+	.luma_frmbuf_end_addr (prod_luma_frmbuf_end_addr),
+	.luma_frmbuf_margin (prod_luma_frmbuf_margin),
+	.luma_frmbuf_addr_valid_pulse (prod_luma_frmbuf_addr_valid_pulse),
+
+	.chroma_frmbuf_start_addr (prod_chroma_frmbuf_start_addr),
+	.chroma_frmbuf_end_addr (prod_chroma_frmbuf_end_addr),
+	.chroma_frmbuf_margin (prod_chroma_frmbuf_margin),
+	.chroma_frmbuf_addr_valid_pulse (prod_chroma_frmbuf_addr_valid_pulse),
+
+	.luma_frmbuf_addr_next (prod_luma_frmbuf_addr_next_0), // O
+	.luma_frmbuf_addr_done (prod_luma_frmbuf_addr_done_0), // O to flush consumer
+	.luma_frmbuf_c0_addr_done (prod_luma_frmbuf_c0_addr_done_0), // O to flush consumer//####
+	.luma_frmbuf_c1_addr_done (prod_luma_frmbuf_c1_addr_done_0), // O to flush consumer//####
+	.luma_frmbuf_c2_addr_done (prod_luma_frmbuf_c2_addr_done_0), // O to flush consumer//####
+	.luma_frmbuf_c3_addr_done (prod_luma_frmbuf_c3_addr_done_0), // O to flush consumer//####
+	.luma_frmbuf_addr_outthres (prod_luma_frmbuf_addr_outthres_0), // O
+	.luma_frmbuf_addr_outthres_valid_pulse (prod_luma_frmbuf_addr_outthres_valid_pulse_0), // O
+	.chroma_frmbuf_addr_next (prod_chroma_frmbuf_addr_next_0), // O
+	.chroma_frmbuf_addr_done (prod_chroma_frmbuf_addr_done_0), // O
+	.chroma_frmbuf_c0_addr_done (prod_chroma_frmbuf_c0_addr_done_0), // O //####
+	.chroma_frmbuf_c1_addr_done (prod_chroma_frmbuf_c1_addr_done_0), // O //####
+	.chroma_frmbuf_c2_addr_done (prod_chroma_frmbuf_c2_addr_done_0), // O //####
+	.chroma_frmbuf_c3_addr_done (prod_chroma_frmbuf_c3_addr_done_0), // O //####
+	.chroma_frmbuf_addr_outthres (prod_chroma_frmbuf_addr_outthres_0), // O
+	.chroma_frmbuf_addr_outthres_valid_pulse (prod_chroma_frmbuf_addr_outthres_valid_pulse_0), // O
+	.luma_timeout (prod_luma_timeout_0), // O
+	//.luma_outofrange (prod_luma_outofrange_0), // O
+	.chroma_timeout (prod_chroma_timeout_0),  // O
+	//.chroma_outofrange (prod_chroma_outofrange_0),  // O
+        .outofrange (prod_outofrange_0),
+
+        .luma_c0_offset          ({32{1'b0}} ),//#### Addition of offset signal 
+        .luma_c1_offset          ({32{1'b0}} ),//#### Addition of offset signal
+        .luma_c2_offset          ({32{1'b0}} ),//#### Addition of offset signal
+        .luma_c3_offset          ({32{1'b0}} ),//#### Addition of offset signal
+        .chroma_c0_offset        ({32{1'b0}} ),//#### Addition of offset signal
+        .chroma_c1_offset        ({32{1'b0}} ),//#### Addition of offset signal
+        .chroma_c2_offset        ({32{1'b0}} ),//#### Addition of offset signal
+        .chroma_c3_offset        ({32{1'b0}} ),//#### Addition of offset signal
+
+
+	.S_AXI_ACLK(s_axi_mm_p_0_aclk),
+	.S_AXI_ARESETN(s_axi_mm_p_0_aresetn),
+	.S_AXI_AWID(s_axi_mm_p_0_awid),
+	.S_AXI_AWADDR(s_axi_mm_p_0_awaddr),
+	.S_AXI_AWLEN(s_axi_mm_p_0_awlen),
+	.S_AXI_AWSIZE(s_axi_mm_p_0_awsize),
+	.S_AXI_AWBURST(s_axi_mm_p_0_awburst),
+	.S_AXI_AWLOCK(s_axi_mm_p_0_awlock),
+	.S_AXI_AWCACHE(s_axi_mm_p_0_awcache),
+	.S_AXI_AWPROT(s_axi_mm_p_0_awprot),
+	.S_AXI_AWQOS(s_axi_mm_p_0_awqos),
+	.S_AXI_AWREGION(s_axi_mm_p_0_awregion),
+	.S_AXI_AWUSER(s_axi_mm_p_0_awuser),
+	.S_AXI_AWVALID(s_axi_mm_p_0_awvalid),
+	.S_AXI_AWREADY(s_axi_mm_p_0_awready),
+	.S_AXI_WDATA(s_axi_mm_p_0_wdata),
+	.S_AXI_WSTRB(s_axi_mm_p_0_wstrb),
+	.S_AXI_WLAST(s_axi_mm_p_0_wlast),
+	.S_AXI_WUSER(s_axi_mm_p_0_wuser),
+	.S_AXI_WVALID(s_axi_mm_p_0_wvalid),
+	.S_AXI_WREADY(s_axi_mm_p_0_wready),
+	.S_AXI_BID(s_axi_mm_p_0_bid),
+	.S_AXI_BRESP(s_axi_mm_p_0_bresp),
+	.S_AXI_BUSER(s_axi_mm_p_0_buser),
+	.S_AXI_BVALID(s_axi_mm_p_0_bvalid),
+	.S_AXI_BREADY(s_axi_mm_p_0_bready),
+	.S_AXI_ARID(s_axi_mm_p_0_arid),
+	.S_AXI_ARADDR(s_axi_mm_p_0_araddr),
+	.S_AXI_ARLEN(s_axi_mm_p_0_arlen),
+	.S_AXI_ARSIZE(s_axi_mm_p_0_arsize),
+	.S_AXI_ARBURST(s_axi_mm_p_0_arburst),
+	.S_AXI_ARLOCK(s_axi_mm_p_0_arlock),
+	.S_AXI_ARCACHE(s_axi_mm_p_0_arcache),
+	.S_AXI_ARPROT(s_axi_mm_p_0_arprot),
+	.S_AXI_ARQOS(s_axi_mm_p_0_arqos),
+	.S_AXI_ARREGION(s_axi_mm_p_0_arregion),
+	.S_AXI_ARUSER(s_axi_mm_p_0_aruser),
+	.S_AXI_ARVALID(s_axi_mm_p_0_arvalid),
+	.S_AXI_ARREADY(s_axi_mm_p_0_arready),
+	.S_AXI_RID(s_axi_mm_p_0_rid),
+	.S_AXI_RDATA(s_axi_mm_p_0_rdata),
+	.S_AXI_RRESP(s_axi_mm_p_0_rresp),
+	.S_AXI_RLAST(s_axi_mm_p_0_rlast),
+	.S_AXI_RUSER(s_axi_mm_p_0_ruser),
+	.S_AXI_RVALID(s_axi_mm_p_0_rvalid),
+	.S_AXI_RREADY(s_axi_mm_p_0_rready)
+	);
+
+   generate
+      if (C_PRODUCER_PORT > 1) begin: gen_producer_chan_1
+	 
+	 syn_ip_v1_0_S_AXI_MM_P # 
+	   (
+	    .C_VIDEO_CHAN (C_VIDEO_CHAN),
+	    .C_VIDEO_CHAN_ID (1),
+	    .C_RECONSTRUCTED_FRAME_DETECT (C_RECONSTRUCTED_FRAME_DETECT),
+	    .C_DEC_ENC_N     (C_DEC_ENC_N),
+	    .C_TIMEOUT    (C_PRODUCER_TIMEOUT),
+       .C_BUF_CNT_WIDTH    (C_BUF_CNT_WIDTH),
+       
+	    .C_FRMBUF_ADDR_WIDTH (C_FRMBUF_ADDR_WIDTH),
+	    .C_S_AXI_ID_WIDTH(C_S_AXI_MM_P_1_ID_WIDTH),
+	    .C_S_AXI_DATA_WIDTH(C_S_AXI_MM_P_1_DATA_WIDTH),
+	    .C_S_AXI_ADDR_WIDTH(C_S_AXI_MM_P_1_ADDR_WIDTH),
+	    .C_S_AXI_AWUSER_WIDTH(C_S_AXI_MM_P_1_AWUSER_WIDTH),
+	    .C_S_AXI_ARUSER_WIDTH(C_S_AXI_MM_P_1_ARUSER_WIDTH),
+	    .C_S_AXI_WUSER_WIDTH(C_S_AXI_MM_P_1_WUSER_WIDTH),
+	    .C_S_AXI_RUSER_WIDTH(C_S_AXI_MM_P_1_RUSER_WIDTH),
+	    .C_S_AXI_BUSER_WIDTH(C_S_AXI_MM_P_1_BUSER_WIDTH)
+	    ) syn_ip_v1_0_S_AXI_MM_P_1_inst 
+	     (
+	      .ctrl_aclk (s_axi_ctrl_aclk),
+	      .ctrl_aresetn (s_axi_ctrl_aresetn),
+	      .en (en),
+
+              .luma_buf_id (prod_luma_buf_id),
+              .chroma_buf_id (prod_chroma_buf_id),
+
+              .S_AXI_SW_ARESET (S_AXI_SW_ARESET[1]),
+	      .luma_frmbuf_start_addr (prod_luma_frmbuf_start_addr),
+	      .luma_frmbuf_end_addr (prod_luma_frmbuf_end_addr),
+	      .luma_frmbuf_margin (prod_luma_frmbuf_margin),
+	      .luma_frmbuf_addr_valid_pulse (prod_luma_frmbuf_addr_valid_pulse),
+
+	      .chroma_frmbuf_start_addr (prod_chroma_frmbuf_start_addr),
+	      .chroma_frmbuf_end_addr (prod_chroma_frmbuf_end_addr),
+	      .chroma_frmbuf_margin (prod_chroma_frmbuf_margin),
+	      .chroma_frmbuf_addr_valid_pulse (prod_chroma_frmbuf_addr_valid_pulse),
+
+	      
+	      .luma_frmbuf_addr_next (prod_luma_frmbuf_addr_next_1),	  // O	
+	      .luma_frmbuf_addr_done (prod_luma_frmbuf_addr_done_1), // O
+	      .luma_frmbuf_c0_addr_done (prod_luma_frmbuf_c0_addr_done_1), // O //####
+	      .luma_frmbuf_c1_addr_done (prod_luma_frmbuf_c1_addr_done_1), // O //####
+	      .luma_frmbuf_c2_addr_done (prod_luma_frmbuf_c2_addr_done_1), // O //####
+	      .luma_frmbuf_c3_addr_done (prod_luma_frmbuf_c3_addr_done_1), // O //####
+	      .luma_frmbuf_addr_outthres (prod_luma_frmbuf_addr_outthres_1), // O
+	      .luma_frmbuf_addr_outthres_valid_pulse (prod_luma_frmbuf_addr_outthres_valid_pulse_1), // O
+    
+	      .chroma_frmbuf_addr_next (prod_chroma_frmbuf_addr_next_1),	  // O	
+	      .chroma_frmbuf_addr_done (prod_chroma_frmbuf_addr_done_1), // O
+	      .chroma_frmbuf_c0_addr_done (prod_chroma_frmbuf_c0_addr_done_1), // O//####
+	      .chroma_frmbuf_c1_addr_done (prod_chroma_frmbuf_c1_addr_done_1), // O//####
+	      .chroma_frmbuf_c2_addr_done (prod_chroma_frmbuf_c2_addr_done_1), // O//####
+	      .chroma_frmbuf_c3_addr_done (prod_chroma_frmbuf_c3_addr_done_1), // O//####
+	      .chroma_frmbuf_addr_outthres (prod_chroma_frmbuf_addr_outthres_1), // O
+	      .chroma_frmbuf_addr_outthres_valid_pulse (prod_chroma_frmbuf_addr_outthres_valid_pulse_1), // O
+
+	      .luma_timeout (prod_luma_timeout_1),
+	      //.luma_outofrange (prod_luma_outofrange_1),
+	      .chroma_timeout (prod_chroma_timeout_1),
+	      //.chroma_outofrange (prod_chroma_outofrange_1),
+              .outofrange (prod_outofrange_1),
+
+   	      .luma_c0_offset          ({32{1'b0}} ),//#### Addition of offset signal 
+              .luma_c1_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .luma_c2_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .luma_c3_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c0_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c1_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c2_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c3_offset        ({32{1'b0}} ),//#### Addition of offset signal
+
+	      .S_AXI_ACLK(s_axi_mm_p_1_aclk),
+	      .S_AXI_ARESETN(s_axi_mm_p_1_aresetn),
+	      .S_AXI_AWID(s_axi_mm_p_1_awid),
+	      .S_AXI_AWADDR(s_axi_mm_p_1_awaddr),
+	      .S_AXI_AWLEN(s_axi_mm_p_1_awlen),
+	      .S_AXI_AWSIZE(s_axi_mm_p_1_awsize),
+	      .S_AXI_AWBURST(s_axi_mm_p_1_awburst),
+	      .S_AXI_AWLOCK(s_axi_mm_p_1_awlock),
+	      .S_AXI_AWCACHE(s_axi_mm_p_1_awcache),
+	      .S_AXI_AWPROT(s_axi_mm_p_1_awprot),
+	      .S_AXI_AWQOS(s_axi_mm_p_1_awqos),
+	      .S_AXI_AWREGION(s_axi_mm_p_1_awregion),
+	      .S_AXI_AWUSER(s_axi_mm_p_1_awuser),
+	      .S_AXI_AWVALID(s_axi_mm_p_1_awvalid),
+	      .S_AXI_AWREADY(s_axi_mm_p_1_awready),
+	      .S_AXI_WDATA(s_axi_mm_p_1_wdata),
+	      .S_AXI_WSTRB(s_axi_mm_p_1_wstrb),
+	      .S_AXI_WLAST(s_axi_mm_p_1_wlast),
+	      .S_AXI_WUSER(s_axi_mm_p_1_wuser),
+	      .S_AXI_WVALID(s_axi_mm_p_1_wvalid),
+	      .S_AXI_WREADY(s_axi_mm_p_1_wready),
+	      .S_AXI_BID(s_axi_mm_p_1_bid),
+	      .S_AXI_BRESP(s_axi_mm_p_1_bresp),
+	      .S_AXI_BUSER(s_axi_mm_p_1_buser),
+	      .S_AXI_BVALID(s_axi_mm_p_1_bvalid),
+	      .S_AXI_BREADY(s_axi_mm_p_1_bready),
+	      .S_AXI_ARID(s_axi_mm_p_1_arid),
+	      .S_AXI_ARADDR(s_axi_mm_p_1_araddr),
+	      .S_AXI_ARLEN(s_axi_mm_p_1_arlen),
+	      .S_AXI_ARSIZE(s_axi_mm_p_1_arsize),
+	      .S_AXI_ARBURST(s_axi_mm_p_1_arburst),
+	      .S_AXI_ARLOCK(s_axi_mm_p_1_arlock),
+	      .S_AXI_ARCACHE(s_axi_mm_p_1_arcache),
+	      .S_AXI_ARPROT(s_axi_mm_p_1_arprot),
+	      .S_AXI_ARQOS(s_axi_mm_p_1_arqos),
+	      .S_AXI_ARREGION(s_axi_mm_p_1_arregion),
+	      .S_AXI_ARUSER(s_axi_mm_p_1_aruser),
+	      .S_AXI_ARVALID(s_axi_mm_p_1_arvalid),
+	      .S_AXI_ARREADY(s_axi_mm_p_1_arready),
+	      .S_AXI_RID(s_axi_mm_p_1_rid),
+	      .S_AXI_RDATA(s_axi_mm_p_1_rdata),
+	      .S_AXI_RRESP(s_axi_mm_p_1_rresp),
+	      .S_AXI_RLAST(s_axi_mm_p_1_rlast),
+	      .S_AXI_RUSER(s_axi_mm_p_1_ruser),
+	      .S_AXI_RVALID(s_axi_mm_p_1_rvalid),
+	      .S_AXI_RREADY(s_axi_mm_p_1_rready)
+	      );
+
+      end // block: gen_producer_chan_1
+      else begin:  no_producer_chan_1
+
+	 assign prod_luma_frmbuf_addr_next_1 = 0;
+	 assign prod_luma_frmbuf_addr_done_1 = 0;
+	 assign prod_luma_frmbuf_addr_outthres_1 = 0;
+	 assign prod_luma_frmbuf_addr_outthres_valid_pulse_1 = 0;
+
+	 assign prod_chroma_frmbuf_addr_next_1 = 0;
+	 assign prod_chroma_frmbuf_addr_done_1 = 0;
+	 assign prod_chroma_frmbuf_addr_outthres_1 = 0;	 
+	 assign prod_chroma_frmbuf_addr_outthres_valid_pulse_1 = 0;
+
+	 assign prod_luma_timeout_1 = 0;
+	 //assign prod_luma_outofrange_1 = 0;
+	 assign prod_chroma_timeout_1 = 0;
+	 //assign prod_chroma_outofrange_1 = 0;
+         assign prod_outofrange_1 = 0;
+	 
+      end
+   endgenerate
+   
+
+   generate
+      if (C_PRODUCER_PORT > 2) begin: gen_producer_chan_2
+	 
+	 syn_ip_v1_0_S_AXI_MM_P # 
+	   (
+	    .C_VIDEO_CHAN (C_VIDEO_CHAN),
+	    .C_VIDEO_CHAN_ID (2),
+	    .C_RECONSTRUCTED_FRAME_DETECT (C_RECONSTRUCTED_FRAME_DETECT),
+	    .C_DEC_ENC_N     (C_DEC_ENC_N),
+	    .C_TIMEOUT    (C_PRODUCER_TIMEOUT),
+       .C_BUF_CNT_WIDTH    (C_BUF_CNT_WIDTH),
+       
+	    .C_FRMBUF_ADDR_WIDTH (C_FRMBUF_ADDR_WIDTH),
+	    .C_S_AXI_ID_WIDTH(C_S_AXI_MM_P_2_ID_WIDTH),
+	    .C_S_AXI_DATA_WIDTH(C_S_AXI_MM_P_2_DATA_WIDTH),
+	    .C_S_AXI_ADDR_WIDTH(C_S_AXI_MM_P_2_ADDR_WIDTH),
+	    .C_S_AXI_AWUSER_WIDTH(C_S_AXI_MM_P_2_AWUSER_WIDTH),
+	    .C_S_AXI_ARUSER_WIDTH(C_S_AXI_MM_P_2_ARUSER_WIDTH),
+	    .C_S_AXI_WUSER_WIDTH(C_S_AXI_MM_P_2_WUSER_WIDTH),
+	    .C_S_AXI_RUSER_WIDTH(C_S_AXI_MM_P_2_RUSER_WIDTH),
+	    .C_S_AXI_BUSER_WIDTH(C_S_AXI_MM_P_2_BUSER_WIDTH)
+	    ) syn_ip_v1_0_S_AXI_MM_P_2_inst 
+	     (
+	      .ctrl_aclk (s_axi_ctrl_aclk),
+	      .ctrl_aresetn (s_axi_ctrl_aresetn),
+	      .en (en),
+
+              .luma_buf_id (prod_luma_buf_id),
+              .chroma_buf_id (prod_chroma_buf_id),
+
+              .S_AXI_SW_ARESET (S_AXI_SW_ARESET[2]),
+	      .luma_frmbuf_start_addr (prod_luma_frmbuf_start_addr),
+	      .luma_frmbuf_end_addr (prod_luma_frmbuf_end_addr),
+	      .luma_frmbuf_margin (prod_luma_frmbuf_margin),
+	      .luma_frmbuf_addr_valid_pulse (prod_luma_frmbuf_addr_valid_pulse),
+
+	      .chroma_frmbuf_start_addr (prod_chroma_frmbuf_start_addr),
+	      .chroma_frmbuf_end_addr (prod_chroma_frmbuf_end_addr),
+	      .chroma_frmbuf_margin (prod_chroma_frmbuf_margin),
+	      .chroma_frmbuf_addr_valid_pulse (prod_chroma_frmbuf_addr_valid_pulse),
+
+	      
+	      .luma_frmbuf_addr_next (prod_luma_frmbuf_addr_next_2), // O
+	      .luma_frmbuf_addr_done (prod_luma_frmbuf_addr_done_2), // O
+	      .luma_frmbuf_c0_addr_done (prod_luma_frmbuf_c0_addr_done_2), // O//####
+	      .luma_frmbuf_c1_addr_done (prod_luma_frmbuf_c1_addr_done_2), // O//####
+	      .luma_frmbuf_c2_addr_done (prod_luma_frmbuf_c2_addr_done_2), // O//####
+	      .luma_frmbuf_c3_addr_done (prod_luma_frmbuf_c3_addr_done_2), // O//####
+	      .luma_frmbuf_addr_outthres (prod_luma_frmbuf_addr_outthres_2), // O
+	      .luma_frmbuf_addr_outthres_valid_pulse (prod_luma_frmbuf_addr_outthres_valid_pulse_2), // O
+	      
+	      .chroma_frmbuf_addr_next (prod_chroma_frmbuf_addr_next_2), // O
+	      .chroma_frmbuf_addr_done (prod_chroma_frmbuf_addr_done_2), // O
+	      .chroma_frmbuf_c0_addr_done (prod_chroma_frmbuf_c0_addr_done_2), // O//####
+	      .chroma_frmbuf_c1_addr_done (prod_chroma_frmbuf_c1_addr_done_2), // O//####
+	      .chroma_frmbuf_c2_addr_done (prod_chroma_frmbuf_c2_addr_done_2), // O//####
+	      .chroma_frmbuf_c3_addr_done (prod_chroma_frmbuf_c3_addr_done_2), // O//####
+	      .chroma_frmbuf_addr_outthres (prod_chroma_frmbuf_addr_outthres_2), // O
+	      .chroma_frmbuf_addr_outthres_valid_pulse (prod_chroma_frmbuf_addr_outthres_valid_pulse_2), // O
+
+	      .luma_timeout (prod_luma_timeout_2),
+	      //.luma_outofrange (prod_luma_outofrange_2),
+	      .chroma_timeout (prod_chroma_timeout_2),
+	      //.chroma_outofrange (prod_chroma_outofrange_2),
+              .outofrange (prod_outofrange_2),
+
+   	      .luma_c0_offset          ({32{1'b0}} ),//#### Addition of offset signal 
+              .luma_c1_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .luma_c2_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .luma_c3_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c0_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c1_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c2_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c3_offset        ({32{1'b0}} ),//#### Addition of offset signal
+
+	      .S_AXI_ACLK(s_axi_mm_p_2_aclk),
+	      .S_AXI_ARESETN(s_axi_mm_p_2_aresetn),
+	      .S_AXI_AWID(s_axi_mm_p_2_awid),
+	      .S_AXI_AWADDR(s_axi_mm_p_2_awaddr),
+	      .S_AXI_AWLEN(s_axi_mm_p_2_awlen),
+	      .S_AXI_AWSIZE(s_axi_mm_p_2_awsize),
+	      .S_AXI_AWBURST(s_axi_mm_p_2_awburst),
+	      .S_AXI_AWLOCK(s_axi_mm_p_2_awlock),
+	      .S_AXI_AWCACHE(s_axi_mm_p_2_awcache),
+	      .S_AXI_AWPROT(s_axi_mm_p_2_awprot),
+	      .S_AXI_AWQOS(s_axi_mm_p_2_awqos),
+	      .S_AXI_AWREGION(s_axi_mm_p_2_awregion),
+	      .S_AXI_AWUSER(s_axi_mm_p_2_awuser),
+	      .S_AXI_AWVALID(s_axi_mm_p_2_awvalid),
+	      .S_AXI_AWREADY(s_axi_mm_p_2_awready),
+	      .S_AXI_WDATA(s_axi_mm_p_2_wdata),
+	      .S_AXI_WSTRB(s_axi_mm_p_2_wstrb),
+	      .S_AXI_WLAST(s_axi_mm_p_2_wlast),
+	      .S_AXI_WUSER(s_axi_mm_p_2_wuser),
+	      .S_AXI_WVALID(s_axi_mm_p_2_wvalid),
+	      .S_AXI_WREADY(s_axi_mm_p_2_wready),
+	      .S_AXI_BID(s_axi_mm_p_2_bid),
+	      .S_AXI_BRESP(s_axi_mm_p_2_bresp),
+	      .S_AXI_BUSER(s_axi_mm_p_2_buser),
+	      .S_AXI_BVALID(s_axi_mm_p_2_bvalid),
+	      .S_AXI_BREADY(s_axi_mm_p_2_bready),
+	      .S_AXI_ARID(s_axi_mm_p_2_arid),
+	      .S_AXI_ARADDR(s_axi_mm_p_2_araddr),
+	      .S_AXI_ARLEN(s_axi_mm_p_2_arlen),
+	      .S_AXI_ARSIZE(s_axi_mm_p_2_arsize),
+	      .S_AXI_ARBURST(s_axi_mm_p_2_arburst),
+	      .S_AXI_ARLOCK(s_axi_mm_p_2_arlock),
+	      .S_AXI_ARCACHE(s_axi_mm_p_2_arcache),
+	      .S_AXI_ARPROT(s_axi_mm_p_2_arprot),
+	      .S_AXI_ARQOS(s_axi_mm_p_2_arqos),
+	      .S_AXI_ARREGION(s_axi_mm_p_2_arregion),
+	      .S_AXI_ARUSER(s_axi_mm_p_2_aruser),
+	      .S_AXI_ARVALID(s_axi_mm_p_2_arvalid),
+	      .S_AXI_ARREADY(s_axi_mm_p_2_arready),
+	      .S_AXI_RID(s_axi_mm_p_2_rid),
+	      .S_AXI_RDATA(s_axi_mm_p_2_rdata),
+	      .S_AXI_RRESP(s_axi_mm_p_2_rresp),
+	      .S_AXI_RLAST(s_axi_mm_p_2_rlast),
+	      .S_AXI_RUSER(s_axi_mm_p_2_ruser),
+	      .S_AXI_RVALID(s_axi_mm_p_2_rvalid),
+	      .S_AXI_RREADY(s_axi_mm_p_2_rready)
+	      );
+      end // block: gen_producer_chan_2
+      else begin : no_producer_chan_2
+
+	 assign prod_luma_frmbuf_addr_next_2 = 0;
+	 assign prod_luma_frmbuf_addr_done_2 = 0;
+	 assign prod_luma_frmbuf_addr_outthres_2 = 0;
+	 assign prod_luma_frmbuf_addr_outthres_valid_pulse_2 = 0;
+	 
+	 assign prod_chroma_frmbuf_addr_next_2 = 0;
+	 assign prod_chroma_frmbuf_addr_done_2 = 0;
+	 assign prod_chroma_frmbuf_addr_outthres_2 = 0;
+	 assign prod_chroma_frmbuf_addr_outthres_valid_pulse_2 = 0;
+
+	 assign prod_luma_timeout_2 = 0;
+	 //assign prod_luma_outofrange_2 = 0;
+	 assign prod_chroma_timeout_2 = 0;
+	 //assign prod_chroma_outofrange_2 = 0;
+         assign prod_outofrange_2 = 0;
+      end
+   endgenerate
+
+   
+   generate
+      if (C_PRODUCER_PORT > 3) begin: gen_producer_chan_3
+	 
+	 syn_ip_v1_0_S_AXI_MM_P # 
+	   (
+	    .C_VIDEO_CHAN (C_VIDEO_CHAN),
+	    .C_VIDEO_CHAN_ID (3),
+	    .C_RECONSTRUCTED_FRAME_DETECT (C_RECONSTRUCTED_FRAME_DETECT),
+	    .C_DEC_ENC_N     (C_DEC_ENC_N),
+	    .C_TIMEOUT    (C_PRODUCER_TIMEOUT),
+       .C_BUF_CNT_WIDTH    (C_BUF_CNT_WIDTH),
+       
+	    .C_FRMBUF_ADDR_WIDTH (C_FRMBUF_ADDR_WIDTH),
+	    .C_S_AXI_ID_WIDTH(C_S_AXI_MM_P_3_ID_WIDTH),
+	    .C_S_AXI_DATA_WIDTH(C_S_AXI_MM_P_3_DATA_WIDTH),
+	    .C_S_AXI_ADDR_WIDTH(C_S_AXI_MM_P_3_ADDR_WIDTH),
+	    .C_S_AXI_AWUSER_WIDTH(C_S_AXI_MM_P_3_AWUSER_WIDTH),
+	    .C_S_AXI_ARUSER_WIDTH(C_S_AXI_MM_P_3_ARUSER_WIDTH),
+	    .C_S_AXI_WUSER_WIDTH(C_S_AXI_MM_P_3_WUSER_WIDTH),
+	    .C_S_AXI_RUSER_WIDTH(C_S_AXI_MM_P_3_RUSER_WIDTH),
+	    .C_S_AXI_BUSER_WIDTH(C_S_AXI_MM_P_3_BUSER_WIDTH)
+	    ) syn_ip_v1_0_S_AXI_MM_P_3_inst 
+	     (
+	      .ctrl_aclk (s_axi_ctrl_aclk),
+	      .ctrl_aresetn (s_axi_ctrl_aresetn),
+	      .en (en),
+
+              .luma_buf_id (prod_luma_buf_id),
+              .chroma_buf_id (prod_chroma_buf_id),
+
+              .S_AXI_SW_ARESET (S_AXI_SW_ARESET[3]),
+
+	      .luma_frmbuf_start_addr (prod_luma_frmbuf_start_addr),
+	      .luma_frmbuf_end_addr (prod_luma_frmbuf_end_addr),
+	      .luma_frmbuf_margin (prod_luma_frmbuf_margin),
+	      .luma_frmbuf_addr_valid_pulse (prod_luma_frmbuf_addr_valid_pulse),
+
+	      .chroma_frmbuf_start_addr (prod_chroma_frmbuf_start_addr),
+	      .chroma_frmbuf_end_addr (prod_chroma_frmbuf_end_addr),
+	      .chroma_frmbuf_margin (prod_chroma_frmbuf_margin),
+	      .chroma_frmbuf_addr_valid_pulse (prod_chroma_frmbuf_addr_valid_pulse),
+	      
+	      .luma_frmbuf_addr_next (prod_luma_frmbuf_addr_next_3),	// O
+	      .luma_frmbuf_addr_done (prod_luma_frmbuf_addr_done_3), // O
+	      .luma_frmbuf_c0_addr_done (prod_luma_frmbuf_c0_addr_done_3), // O//####
+	      .luma_frmbuf_c1_addr_done (prod_luma_frmbuf_c1_addr_done_3), // O//####
+	      .luma_frmbuf_c2_addr_done (prod_luma_frmbuf_c2_addr_done_3), // O//####
+	      .luma_frmbuf_c3_addr_done (prod_luma_frmbuf_c3_addr_done_3), // O//####
+	      .luma_frmbuf_addr_outthres (prod_luma_frmbuf_addr_outthres_3),
+	      .luma_frmbuf_addr_outthres_valid_pulse (prod_luma_frmbuf_addr_outthres_valid_pulse_3), // O	      
+	      
+	      .chroma_frmbuf_addr_next (prod_chroma_frmbuf_addr_next_3),	// O
+	      .chroma_frmbuf_addr_done (prod_chroma_frmbuf_addr_done_3), // O
+	      .chroma_frmbuf_c0_addr_done (prod_chroma_frmbuf_c0_addr_done_3), // O//####
+	      .chroma_frmbuf_c1_addr_done (prod_chroma_frmbuf_c1_addr_done_3), // O//####
+	      .chroma_frmbuf_c2_addr_done (prod_chroma_frmbuf_c2_addr_done_3), // O//####
+	      .chroma_frmbuf_c3_addr_done (prod_chroma_frmbuf_c3_addr_done_3), // O//####
+	      .chroma_frmbuf_addr_outthres (prod_chroma_frmbuf_addr_outthres_3),
+	      .chroma_frmbuf_addr_outthres_valid_pulse (prod_chroma_frmbuf_addr_outthres_valid_pulse_3), // O	   
+	      
+	      .luma_timeout (prod_luma_timeout_3),
+	      //.luma_outofrange (prod_luma_outofrange_3),
+	      .chroma_timeout (prod_chroma_timeout_3),
+	      //.chroma_outofrange (prod_chroma_outofrange_3),
+              .outofrange (prod_outofrange_3),
+
+   	      .luma_c0_offset          ({32{1'b0}} ),//#### Addition of offset signal 
+              .luma_c1_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .luma_c2_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .luma_c3_offset          ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c0_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c1_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c2_offset        ({32{1'b0}} ),//#### Addition of offset signal
+              .chroma_c3_offset        ({32{1'b0}} ),//#### Addition of offset signal
+
+	      .S_AXI_ACLK(s_axi_mm_p_3_aclk),
+	      .S_AXI_ARESETN(s_axi_mm_p_3_aresetn),
+	      .S_AXI_AWID(s_axi_mm_p_3_awid),
+	      .S_AXI_AWADDR(s_axi_mm_p_3_awaddr),
+	      .S_AXI_AWLEN(s_axi_mm_p_3_awlen),
+	      .S_AXI_AWSIZE(s_axi_mm_p_3_awsize),
+	      .S_AXI_AWBURST(s_axi_mm_p_3_awburst),
+	      .S_AXI_AWLOCK(s_axi_mm_p_3_awlock),
+	      .S_AXI_AWCACHE(s_axi_mm_p_3_awcache),
+	      .S_AXI_AWPROT(s_axi_mm_p_3_awprot),
+	      .S_AXI_AWQOS(s_axi_mm_p_3_awqos),
+	      .S_AXI_AWREGION(s_axi_mm_p_3_awregion),
+	      .S_AXI_AWUSER(s_axi_mm_p_3_awuser),
+	      .S_AXI_AWVALID(s_axi_mm_p_3_awvalid),
+	      .S_AXI_AWREADY(s_axi_mm_p_3_awready),
+	      .S_AXI_WDATA(s_axi_mm_p_3_wdata),
+	      .S_AXI_WSTRB(s_axi_mm_p_3_wstrb),
+	      .S_AXI_WLAST(s_axi_mm_p_3_wlast),
+	      .S_AXI_WUSER(s_axi_mm_p_3_wuser),
+	      .S_AXI_WVALID(s_axi_mm_p_3_wvalid),
+	      .S_AXI_WREADY(s_axi_mm_p_3_wready),
+	      .S_AXI_BID(s_axi_mm_p_3_bid),
+	      .S_AXI_BRESP(s_axi_mm_p_3_bresp),
+	      .S_AXI_BUSER(s_axi_mm_p_3_buser),
+	      .S_AXI_BVALID(s_axi_mm_p_3_bvalid),
+	      .S_AXI_BREADY(s_axi_mm_p_3_bready),
+	      .S_AXI_ARID(s_axi_mm_p_3_arid),
+	      .S_AXI_ARADDR(s_axi_mm_p_3_araddr),
+	      .S_AXI_ARLEN(s_axi_mm_p_3_arlen),
+	      .S_AXI_ARSIZE(s_axi_mm_p_3_arsize),
+	      .S_AXI_ARBURST(s_axi_mm_p_3_arburst),
+	      .S_AXI_ARLOCK(s_axi_mm_p_3_arlock),
+	      .S_AXI_ARCACHE(s_axi_mm_p_3_arcache),
+	      .S_AXI_ARPROT(s_axi_mm_p_3_arprot),
+	      .S_AXI_ARQOS(s_axi_mm_p_3_arqos),
+	      .S_AXI_ARREGION(s_axi_mm_p_3_arregion),
+	      .S_AXI_ARUSER(s_axi_mm_p_3_aruser),
+	      .S_AXI_ARVALID(s_axi_mm_p_3_arvalid),
+	      .S_AXI_ARREADY(s_axi_mm_p_3_arready),
+	      .S_AXI_RID(s_axi_mm_p_3_rid),
+	      .S_AXI_RDATA(s_axi_mm_p_3_rdata),
+	      .S_AXI_RRESP(s_axi_mm_p_3_rresp),
+	      .S_AXI_RLAST(s_axi_mm_p_3_rlast),
+	      .S_AXI_RUSER(s_axi_mm_p_3_ruser),
+	      .S_AXI_RVALID(s_axi_mm_p_3_rvalid),
+	      .S_AXI_RREADY(s_axi_mm_p_3_rready)
+	      );
+
+      end // block: gen_producer_chan_3
+      else begin: no_producer_chan_3
+
+	 assign prod_luma_frmbuf_addr_next_3 = 0;
+	 assign prod_luma_frmbuf_addr_done_3 = 0;
+	 assign prod_luma_frmbuf_addr_outthres_3 = 0;
+	 assign prod_luma_frmbuf_addr_outthres_valid_pulse_3 = 0;	 
+
+	 assign prod_chroma_frmbuf_addr_next_3 = 0;
+	 assign prod_chroma_frmbuf_addr_done_3 = 0;
+	 assign prod_chroma_frmbuf_addr_outthres_3 = 0;
+	 assign prod_chroma_frmbuf_addr_outthres_valid_pulse_3 = 0;	 
+
+	 assign prod_luma_timeout_3 = 0;
+	 //assign prod_luma_outofrange_3 = 0;
+	 assign prod_chroma_timeout_3 = 0;
+	 //assign prod_chroma_outofrange_3 = 0;
+         assign prod_outofrange_3 = 0;
+	 
+      end
+   endgenerate
+   
+   
+   // Instantiation of Axi Bus Interface M_AXI_MM_0
+   syn_ip_v1_0_M_AXI_MM # 
+     ( 
+       .C_M_AXI_ID_WIDTH(C_M_AXI_MM_0_ID_WIDTH),
+       .C_M_AXI_ADDR_WIDTH(C_M_AXI_MM_0_ADDR_WIDTH),
+       .C_M_AXI_DATA_WIDTH(C_M_AXI_MM_0_DATA_WIDTH),
+       .C_M_AXI_AWUSER_WIDTH(C_M_AXI_MM_0_AWUSER_WIDTH),
+       .C_M_AXI_ARUSER_WIDTH(C_M_AXI_MM_0_ARUSER_WIDTH),
+       .C_M_AXI_WUSER_WIDTH(C_M_AXI_MM_0_WUSER_WIDTH),
+       .C_M_AXI_RUSER_WIDTH(C_M_AXI_MM_0_RUSER_WIDTH),
+       .C_M_AXI_BUSER_WIDTH(C_M_AXI_MM_0_BUSER_WIDTH)
+       ) syn_ip_v1_0_M_AXI_MM_0_inst 
+       (
+
+	.m_axi_arid          (m_axi_arid_0),
+	.m_axi_araddr        (m_axi_araddr_0),
+	.m_axi_arlen         (m_axi_arlen_0),
+	.m_axi_arsize        (m_axi_arsize_0),
+	.m_axi_arburst       (m_axi_arburst_0),
+	.m_axi_arlock        (m_axi_arlock_0),
+	.m_axi_arcache       (m_axi_arcache_0),
+	.m_axi_arprot        (m_axi_arprot_0),
+	.m_axi_arregion      (m_axi_arregion_0),
+	.m_axi_arqos         (m_axi_arqos_0),
+	.m_axi_arvalid       (m_axi_arvalid_0),
+	.m_axi_arready       (m_axi_arready_0),
+	.m_axi_rid           (m_axi_rid_0),
+	.m_axi_rdata         (m_axi_rdata_0),
+	.m_axi_rresp         (m_axi_rresp_0),
+	.m_axi_rlast         (m_axi_rlast_0),
+	.m_axi_rvalid        (m_axi_rvalid_0),
+	.m_axi_rready        (m_axi_rready_0),
+
+	.m_axi_awid          (m_axi_awid_0),
+	.m_axi_awaddr        (m_axi_awaddr_0),
+	.m_axi_awlen         (m_axi_awlen_0),
+	.m_axi_awsize        (m_axi_awsize_0),
+	.m_axi_awburst       (m_axi_awburst_0),
+	.m_axi_awlock        (m_axi_awlock_0),
+	.m_axi_awcache       (m_axi_awcache_0),
+	.m_axi_awprot        (m_axi_awprot_0),
+	.m_axi_awregion      (m_axi_awregion_0),
+	.m_axi_awqos         (m_axi_awqos_0),
+	.m_axi_awvalid       (m_axi_awvalid_0),
+	.m_axi_awready       (m_axi_awready_0),
+	.m_axi_wdata         (m_axi_wdata_0),
+	.m_axi_wstrb         (m_axi_wstrb_0),
+	.m_axi_wlast         (m_axi_wlast_0),
+	.m_axi_wvalid        (m_axi_wvalid_0),
+	.m_axi_wready        (m_axi_wready_0),
+	.m_axi_bid           (m_axi_bid_0),
+	.m_axi_bresp         (m_axi_bresp_0),
+	.m_axi_bvalid        (m_axi_bvalid_0),
+	.m_axi_bready        (m_axi_bready_0),
+
+	.M_AXI_ACLK(m_axi_mm_0_aclk),
+	.M_AXI_ARESETN(m_axi_mm_0_aresetn),
+	.M_AXI_AWID(m_axi_mm_0_awid),
+	.M_AXI_AWADDR(m_axi_mm_0_awaddr),
+	.M_AXI_AWLEN(m_axi_mm_0_awlen),
+	.M_AXI_AWSIZE(m_axi_mm_0_awsize),
+	.M_AXI_AWBURST(m_axi_mm_0_awburst),
+	.M_AXI_AWLOCK(m_axi_mm_0_awlock),
+	.M_AXI_AWCACHE(m_axi_mm_0_awcache),
+	.M_AXI_AWPROT(m_axi_mm_0_awprot),
+	.M_AXI_AWQOS(m_axi_mm_0_awqos),
+	.M_AXI_AWUSER(m_axi_mm_0_awuser),
+	.M_AXI_AWVALID(m_axi_mm_0_awvalid),
+	.M_AXI_AWREADY(m_axi_mm_0_awready),
+	.M_AXI_WDATA(m_axi_mm_0_wdata),
+	.M_AXI_WSTRB(m_axi_mm_0_wstrb),
+	.M_AXI_WLAST(m_axi_mm_0_wlast),
+	.M_AXI_WUSER(m_axi_mm_0_wuser),
+	.M_AXI_WVALID(m_axi_mm_0_wvalid),
+	.M_AXI_WREADY(m_axi_mm_0_wready),
+	.M_AXI_BID(m_axi_mm_0_bid),
+	.M_AXI_BRESP(m_axi_mm_0_bresp),
+	.M_AXI_BUSER(m_axi_mm_0_buser),
+	.M_AXI_BVALID(m_axi_mm_0_bvalid),
+	.M_AXI_BREADY(m_axi_mm_0_bready),
+	.M_AXI_ARID(m_axi_mm_0_arid),
+	.M_AXI_ARADDR(m_axi_mm_0_araddr),
+	.M_AXI_ARLEN(m_axi_mm_0_arlen),
+	.M_AXI_ARSIZE(m_axi_mm_0_arsize),
+	.M_AXI_ARBURST(m_axi_mm_0_arburst),
+	.M_AXI_ARLOCK(m_axi_mm_0_arlock),
+	.M_AXI_ARCACHE(m_axi_mm_0_arcache),
+	.M_AXI_ARPROT(m_axi_mm_0_arprot),
+	.M_AXI_ARQOS(m_axi_mm_0_arqos),
+	.M_AXI_ARUSER(m_axi_mm_0_aruser),
+	.M_AXI_ARVALID(m_axi_mm_0_arvalid),
+	.M_AXI_ARREADY(m_axi_mm_0_arready),
+	.M_AXI_RID(m_axi_mm_0_rid),
+	.M_AXI_RDATA(m_axi_mm_0_rdata),
+	.M_AXI_RRESP(m_axi_mm_0_rresp),
+	.M_AXI_RLAST(m_axi_mm_0_rlast),
+	.M_AXI_RUSER(m_axi_mm_0_ruser),
+	.M_AXI_RVALID(m_axi_mm_0_rvalid),
+	.M_AXI_RREADY(m_axi_mm_0_rready)
+	);
+
+   generate
+      if (C_CONSUMER_PORT > 1) begin: gen_consumer_m_port_1
+	 
+   // Instantiation of Axi Bus Interface M_AXI_MM_1
+   syn_ip_v1_0_M_AXI_MM # 
+     ( 
+       .C_M_AXI_ID_WIDTH(C_M_AXI_MM_1_ID_WIDTH),
+       .C_M_AXI_ADDR_WIDTH(C_M_AXI_MM_1_ADDR_WIDTH),
+       .C_M_AXI_DATA_WIDTH(C_M_AXI_MM_1_DATA_WIDTH),
+       .C_M_AXI_AWUSER_WIDTH(C_M_AXI_MM_1_AWUSER_WIDTH),
+       .C_M_AXI_ARUSER_WIDTH(C_M_AXI_MM_1_ARUSER_WIDTH),
+       .C_M_AXI_WUSER_WIDTH(C_M_AXI_MM_1_WUSER_WIDTH),
+       .C_M_AXI_RUSER_WIDTH(C_M_AXI_MM_1_RUSER_WIDTH),
+       .C_M_AXI_BUSER_WIDTH(C_M_AXI_MM_1_BUSER_WIDTH)
+       ) syn_ip_v1_0_M_AXI_MM_1_inst 
+       (
+	.m_axi_arid          (m_axi_arid_1),
+	.m_axi_araddr        (m_axi_araddr_1),
+	.m_axi_arlen         (m_axi_arlen_1),
+	.m_axi_arsize        (m_axi_arsize_1),
+	.m_axi_arburst       (m_axi_arburst_1),
+	.m_axi_arlock        (m_axi_arlock_1),
+	.m_axi_arcache       (m_axi_arcache_1),
+	.m_axi_arprot        (m_axi_arprot_1),
+	.m_axi_arregion      (m_axi_arregion_1),
+	.m_axi_arqos         (m_axi_arqos_1),
+	.m_axi_arvalid       (m_axi_arvalid_1),
+	.m_axi_arready       (m_axi_arready_1),
+	.m_axi_rid           (m_axi_rid_1),
+	.m_axi_rdata         (m_axi_rdata_1),
+	.m_axi_rresp         (m_axi_rresp_1),
+	.m_axi_rlast         (m_axi_rlast_1),
+	.m_axi_rvalid        (m_axi_rvalid_1),
+	.m_axi_rready        (m_axi_rready_1),
+
+	.m_axi_awid          (m_axi_awid_1),
+	.m_axi_awaddr        (m_axi_awaddr_1),
+	.m_axi_awlen         (m_axi_awlen_1),
+	.m_axi_awsize        (m_axi_awsize_1),
+	.m_axi_awburst       (m_axi_awburst_1),
+	.m_axi_awlock        (m_axi_awlock_1),
+	.m_axi_awcache       (m_axi_awcache_1),
+	.m_axi_awprot        (m_axi_awprot_1),
+	.m_axi_awregion      (m_axi_awregion_1),
+	.m_axi_awqos         (m_axi_awqos_1),
+	.m_axi_awvalid       (m_axi_awvalid_1),
+	.m_axi_awready       (m_axi_awready_1),
+	.m_axi_wdata         (m_axi_wdata_1),
+	.m_axi_wstrb         (m_axi_wstrb_1),
+	.m_axi_wlast         (m_axi_wlast_1),
+	.m_axi_wvalid        (m_axi_wvalid_1),
+	.m_axi_wready        (m_axi_wready_1),
+	.m_axi_bid           (m_axi_bid_1),
+	.m_axi_bresp         (m_axi_bresp_1),
+	.m_axi_bvalid        (m_axi_bvalid_1),
+	.m_axi_bready        (m_axi_bready_1),
+
+	.M_AXI_ACLK(m_axi_mm_1_aclk),
+	.M_AXI_ARESETN(m_axi_mm_1_aresetn),
+	.M_AXI_AWID(m_axi_mm_1_awid),
+	.M_AXI_AWADDR(m_axi_mm_1_awaddr),
+	.M_AXI_AWLEN(m_axi_mm_1_awlen),
+	.M_AXI_AWSIZE(m_axi_mm_1_awsize),
+	.M_AXI_AWBURST(m_axi_mm_1_awburst),
+	.M_AXI_AWLOCK(m_axi_mm_1_awlock),
+	.M_AXI_AWCACHE(m_axi_mm_1_awcache),
+	.M_AXI_AWPROT(m_axi_mm_1_awprot),
+	.M_AXI_AWQOS(m_axi_mm_1_awqos),
+	.M_AXI_AWUSER(m_axi_mm_1_awuser),
+	.M_AXI_AWVALID(m_axi_mm_1_awvalid),
+	.M_AXI_AWREADY(m_axi_mm_1_awready),
+	.M_AXI_WDATA(m_axi_mm_1_wdata),
+	.M_AXI_WSTRB(m_axi_mm_1_wstrb),
+	.M_AXI_WLAST(m_axi_mm_1_wlast),
+	.M_AXI_WUSER(m_axi_mm_1_wuser),
+	.M_AXI_WVALID(m_axi_mm_1_wvalid),
+	.M_AXI_WREADY(m_axi_mm_1_wready),
+	.M_AXI_BID(m_axi_mm_1_bid),
+	.M_AXI_BRESP(m_axi_mm_1_bresp),
+	.M_AXI_BUSER(m_axi_mm_1_buser),
+	.M_AXI_BVALID(m_axi_mm_1_bvalid),
+	.M_AXI_BREADY(m_axi_mm_1_bready),
+	.M_AXI_ARID(m_axi_mm_1_arid),
+	.M_AXI_ARADDR(m_axi_mm_1_araddr),
+	.M_AXI_ARLEN(m_axi_mm_1_arlen),
+	.M_AXI_ARSIZE(m_axi_mm_1_arsize),
+	.M_AXI_ARBURST(m_axi_mm_1_arburst),
+	.M_AXI_ARLOCK(m_axi_mm_1_arlock),
+	.M_AXI_ARCACHE(m_axi_mm_1_arcache),
+	.M_AXI_ARPROT(m_axi_mm_1_arprot),
+	.M_AXI_ARQOS(m_axi_mm_1_arqos),
+	.M_AXI_ARUSER(m_axi_mm_1_aruser),
+	.M_AXI_ARVALID(m_axi_mm_1_arvalid),
+	.M_AXI_ARREADY(m_axi_mm_1_arready),
+	.M_AXI_RID(m_axi_mm_1_rid),
+	.M_AXI_RDATA(m_axi_mm_1_rdata),
+	.M_AXI_RRESP(m_axi_mm_1_rresp),
+	.M_AXI_RLAST(m_axi_mm_1_rlast),
+	.M_AXI_RUSER(m_axi_mm_1_ruser),
+	.M_AXI_RVALID(m_axi_mm_1_rvalid),
+	.M_AXI_RREADY(m_axi_mm_1_rready)
+	);
+
+      end // block: gen_consumer_m_port_1
+      else begin: gen_no_consumer_m_port_1
+
+	 assign m_axi_arready_1  = 0;
+	 assign m_axi_rid_1  = 0;
+	 assign m_axi_rdata_1  = 0;
+	 assign m_axi_rresp_1  = 0;
+	 assign m_axi_rlast_1  = 0;
+	 assign m_axi_rvalid_1  = 0;
+	 
+	 assign m_axi_awready_1  = 0;
+	 assign m_axi_wready_1  = 0;
+	 assign m_axi_bid_1  = 0;
+	 assign m_axi_bresp_1  = 0;
+	 assign m_axi_bvalid_1  = 0;
+	 
+	 assign m_axi_mm_1_awid  = 0;
+	 assign m_axi_mm_1_awaddr  = 0;
+	 assign m_axi_mm_1_awlen  = 0;
+	 assign m_axi_mm_1_awsize  = 0;
+	 assign m_axi_mm_1_awburst  = 0;
+	 assign m_axi_mm_1_awlock  = 0;
+	 assign m_axi_mm_1_awcache  = 0;
+	 assign m_axi_mm_1_awprot  = 0;
+	 assign m_axi_mm_1_awqos  = 0;
+	 assign m_axi_mm_1_awuser  = 0;
+	 assign m_axi_mm_1_awvalid  = 0;
+	 assign m_axi_mm_1_wdata  = 0;
+	 assign m_axi_mm_1_wstrb  = 0;
+	 assign m_axi_mm_1_wlast  = 0;
+	 assign m_axi_mm_1_wuser  = 0;
+	 assign m_axi_mm_1_wvalid  = 0;
+	 assign m_axi_mm_1_bready  = 0;
+	 assign m_axi_mm_1_arid  = 0;
+	 assign m_axi_mm_1_araddr  = 0;
+	 assign m_axi_mm_1_arlen  = 0;
+	 assign m_axi_mm_1_arsize  = 0;
+	 assign m_axi_mm_1_arburst  = 0;
+	 assign m_axi_mm_1_arlock  = 0;
+	 assign m_axi_mm_1_arcache  = 0;
+	 assign m_axi_mm_1_arprot  = 0;
+	 assign m_axi_mm_1_arqos  = 0;
+	 assign m_axi_mm_1_aruser  = 0;
+	 assign m_axi_mm_1_arvalid  = 0;
+	 assign m_axi_mm_1_rready  = 0;
+      end
+
+   endgenerate
+	 
+   // Instantiation of Axi Bus Interface S_AXI_MM_0
+   // From consumer to syn_ip 
+   syn_ip_v1_0_S_AXI_MM # 
+     ( 
+       .C_VIDEO_CHAN (C_VIDEO_CHAN),
+       .C_VIDEO_CHAN_ID (0),
+       .C_CONSUMER_CHAN (C_CONSUMER_CHAN_PER_PORT),
+       .C_DEC_ENC_N (C_DEC_ENC_N),
+       .C_SRC_FRAME_DETECT (C_SRC_FRAME_DETECT),
+       .C_FRMBUF_ADDR_WIDTH (C_FRMBUF_ADDR_WIDTH),
+       .C_TIMEOUT    (C_CONSUMER_TIMEOUT),
+       .C_BUF_CNT_WIDTH    (C_BUF_CNT_WIDTH),
+       
+       .C_S_AXI_ID_WIDTH(C_S_AXI_MM_0_ID_WIDTH),
+       .C_S_AXI_DATA_WIDTH(C_S_AXI_MM_0_DATA_WIDTH),
+       .C_S_AXI_ADDR_WIDTH(C_S_AXI_MM_0_ADDR_WIDTH),
+       .C_S_AXI_AWUSER_WIDTH(C_S_AXI_MM_0_AWUSER_WIDTH),
+       .C_S_AXI_ARUSER_WIDTH(C_S_AXI_MM_0_ARUSER_WIDTH),
+       .C_S_AXI_WUSER_WIDTH(C_S_AXI_MM_0_WUSER_WIDTH),
+       .C_S_AXI_RUSER_WIDTH(C_S_AXI_MM_0_RUSER_WIDTH),
+       .C_S_AXI_BUSER_WIDTH(C_S_AXI_MM_0_BUSER_WIDTH)
+       ) syn_ip_v1_0_S_AXI_MM_0_inst 
+       (
+
+        .S_AXI_SW_ARESET (S_AXI_SW_ARESET),
+        .buf_rd_cnt_en   (buf_rd_cnt_en),
+
+	.producer_aclk (producer_aclk),
+	.producer_aresetn (producer_aresetn),
+
+	.prod_luma_frmbuf_addr_done (prod_luma_frmbuf_addr_done_0
+				     | prod_luma_frmbuf_addr_done_1
+				     | prod_luma_frmbuf_addr_done_2
+				     | prod_luma_frmbuf_addr_done_3), // flush command from producer
+	.prod_luma_frmbuf_c0_addr_done (prod_luma_frmbuf_c0_addr_done_0
+				     | prod_luma_frmbuf_c0_addr_done_1
+				     | prod_luma_frmbuf_c0_addr_done_2
+				     | prod_luma_frmbuf_c0_addr_done_3), // flush command from producer //####
+	.prod_luma_frmbuf_c1_addr_done (prod_luma_frmbuf_c1_addr_done_0
+				     | prod_luma_frmbuf_c1_addr_done_1
+				     | prod_luma_frmbuf_c1_addr_done_2
+				     | prod_luma_frmbuf_c1_addr_done_3), // flush command from producer //####
+	.prod_luma_frmbuf_c2_addr_done (prod_luma_frmbuf_c2_addr_done_0
+				     | prod_luma_frmbuf_c2_addr_done_1
+				     | prod_luma_frmbuf_c2_addr_done_2
+				     | prod_luma_frmbuf_c2_addr_done_3), // flush command from producer //####
+	.prod_luma_frmbuf_c3_addr_done (prod_luma_frmbuf_c3_addr_done_0
+				     | prod_luma_frmbuf_c3_addr_done_1
+				     | prod_luma_frmbuf_c3_addr_done_2
+				     | prod_luma_frmbuf_c3_addr_done_3), // flush command from producer //####
+	.prod_luma_frmbuf_addr_outthres (prod_luma_frmbuf_addr_outthres),
+	.prod_luma_frmbuf_addr_outthres_valid_pulse (prod_luma_frmbuf_addr_outthres_valid_pulse),
+
+	.prod_chroma_frmbuf_addr_done (prod_chroma_frmbuf_addr_done_0
+				       | prod_chroma_frmbuf_addr_done_1
+				       | prod_chroma_frmbuf_addr_done_2
+				       | prod_chroma_frmbuf_addr_done_3),
+	.prod_chroma_frmbuf_c0_addr_done (prod_chroma_frmbuf_c0_addr_done_0
+				       | prod_chroma_frmbuf_c0_addr_done_1
+				       | prod_chroma_frmbuf_c0_addr_done_2
+				       | prod_chroma_frmbuf_c0_addr_done_3),//####
+	.prod_chroma_frmbuf_c1_addr_done (prod_chroma_frmbuf_c1_addr_done_0
+				       | prod_chroma_frmbuf_c1_addr_done_1
+				       | prod_chroma_frmbuf_c1_addr_done_2
+				       | prod_chroma_frmbuf_c1_addr_done_3),//####
+	.prod_chroma_frmbuf_c2_addr_done (prod_chroma_frmbuf_c2_addr_done_0
+				       | prod_chroma_frmbuf_c2_addr_done_1
+				       | prod_chroma_frmbuf_c2_addr_done_2
+				       | prod_chroma_frmbuf_c2_addr_done_3),//####
+	.prod_chroma_frmbuf_c3_addr_done (prod_chroma_frmbuf_c3_addr_done_0
+				       | prod_chroma_frmbuf_c3_addr_done_1
+				       | prod_chroma_frmbuf_c3_addr_done_2
+				       | prod_chroma_frmbuf_c3_addr_done_3),//####
+	
+	.prod_chroma_frmbuf_addr_outthres (prod_chroma_frmbuf_addr_outthres),
+	
+	.prod_chroma_frmbuf_addr_outthres_valid_pulse (prod_chroma_frmbuf_addr_outthres_valid_pulse),
+	
+	.ctrl_aclk           (s_axi_ctrl_aclk),
+	.ctrl_aresetn        (s_axi_ctrl_aresetn),
+	.en                  (en),
+	.luma_frmbuf_start_addr   (cons_luma_frmbuf_start_addr),
+	.luma_frmbuf_end_addr     (cons_luma_frmbuf_end_addr),
+	.luma_frmbuf_addr_valid_pulse   (cons_luma_frmbuf_addr_valid_pulse),
+	.chroma_frmbuf_start_addr   (cons_chroma_frmbuf_start_addr),
+	.chroma_frmbuf_end_addr     (cons_chroma_frmbuf_end_addr),
+	.chroma_frmbuf_addr_valid_pulse   (cons_chroma_frmbuf_addr_valid_pulse),
+
+        .cons_luma_buf_rd_cnt_in (cons_luma_buf_rd_cnt1), 
+        .cons_chroma_buf_rd_cnt_in (cons_chroma_buf_rd_cnt1), 
+        .cons_luma_buf_rd_cnt_out (cons_luma_buf_rd_cnt0), 
+        .cons_chroma_buf_rd_cnt_out (cons_chroma_buf_rd_cnt0), 
+
+	.prod_luma_buf_id(prod_luma_buf_id),	//####Addition of Buffer id signals
+	.prod_chroma_buf_id(prod_chroma_buf_id),//####Addition of Buffer id signals
+	.cons_luma_buf_id(cons_luma_buf_id),	//####Addition of Buffer id signals
+	.cons_chroma_buf_id(cons_chroma_buf_id),//####Addition of Buffer id signals
+         .cons_luma_frmbuf_addr_done_in ((cons_luma_frmbuf_addr_done_0 |
+                                          cons_luma_frmbuf_addr_done_1 )), 
+         .cons_chroma_frmbuf_addr_done_in ((cons_chroma_frmbuf_addr_done_0 |
+                                            cons_chroma_frmbuf_addr_done_1 )), 
+
+
+	.luma_frmbuf_addr_next    (cons_luma_frmbuf_addr_next_0[C_VIDEO_CHAN-1:0]), // O, to ring buffer
+	.luma_frmbuf_addr_done    (cons_luma_frmbuf_addr_done_0[C_VIDEO_CHAN-1:0]), // O, to ring buffer
+	
+	.chroma_frmbuf_addr_next    (cons_chroma_frmbuf_addr_next_0[C_VIDEO_CHAN-1:0]), // O
+	.chroma_frmbuf_addr_done    (cons_chroma_frmbuf_addr_done_0[C_VIDEO_CHAN-1:0]), // O
+
+	.luma_outofrange         (cons_luma_outofrange_0), // O
+	.chroma_outofrange       (cons_chroma_outofrange_0), // O
+	.luma_timeout            (cons_luma_timeout_0), // O
+	.chroma_timeout          (cons_chroma_timeout_0), // O
+	
+        .luma_c0_offset          ({32{1'b0}} ),//####Addition of offset signal
+        .luma_c1_offset          ({32{1'b0}} ),//####Addition of offset signal
+        .luma_c2_offset          ({32{1'b0}} ),//####Addition of offset signal
+        .luma_c3_offset          ({32{1'b0}} ),//####Addition of offset signal
+        .chroma_c0_offset        ({32{1'b0}} ),//####Addition of offset signal
+        .chroma_c1_offset        ({32{1'b0}} ),//####Addition of offset signal
+        .chroma_c2_offset        ({32{1'b0}} ),//####Addition of offset signal
+        .chroma_c3_offset        ({32{1'b0}} ),//####Addition of offset signal
+
+	.m_axi_arid          (m_axi_arid_0),
+	.m_axi_araddr        (m_axi_araddr_0),
+	.m_axi_arlen         (m_axi_arlen_0),
+	.m_axi_arsize        (m_axi_arsize_0),
+	.m_axi_arburst       (m_axi_arburst_0),
+	.m_axi_arlock        (m_axi_arlock_0),
+	.m_axi_arcache       (m_axi_arcache_0),
+	.m_axi_arprot        (m_axi_arprot_0),
+	.m_axi_arregion      (m_axi_arregion_0),
+	.m_axi_arqos         (m_axi_arqos_0),
+	.m_axi_arvalid       (m_axi_arvalid_0),
+	.m_axi_arready       (m_axi_arready_0),
+	.m_axi_rid           (m_axi_rid_0),
+	.m_axi_rdata         (m_axi_rdata_0),
+	.m_axi_rresp         (m_axi_rresp_0),
+	.m_axi_rlast         (m_axi_rlast_0),
+	.m_axi_rvalid        (m_axi_rvalid_0),
+	.m_axi_rready        (m_axi_rready_0),
+	
+	.m_axi_awid          (m_axi_awid_0),
+	.m_axi_awaddr        (m_axi_awaddr_0),
+	.m_axi_awlen         (m_axi_awlen_0),
+	.m_axi_awsize        (m_axi_awsize_0),
+	.m_axi_awburst       (m_axi_awburst_0),
+	.m_axi_awlock        (m_axi_awlock_0),
+	.m_axi_awcache       (m_axi_awcache_0),
+	.m_axi_awprot        (m_axi_awprot_0),
+	.m_axi_awregion      (m_axi_awregion_0),
+	.m_axi_awqos         (m_axi_awqos_0),
+	.m_axi_awvalid       (m_axi_awvalid_0),
+	.m_axi_awready       (m_axi_awready_0),
+	.m_axi_wdata         (m_axi_wdata_0),
+	.m_axi_wstrb         (m_axi_wstrb_0),
+	.m_axi_wlast         (m_axi_wlast_0),
+	.m_axi_wvalid        (m_axi_wvalid_0),
+	.m_axi_wready        (m_axi_wready_0),
+	.m_axi_bid           (m_axi_bid_0),
+	.m_axi_bresp         (m_axi_bresp_0),
+	.m_axi_bvalid        (m_axi_bvalid_0),
+	.m_axi_bready        (m_axi_bready_0),
+	
+	
+	.S_AXI_ACLK(s_axi_mm_0_aclk),
+	.S_AXI_ARESETN(s_axi_mm_0_aresetn),
+	.S_AXI_AWID(s_axi_mm_0_awid),
+	.S_AXI_AWADDR(s_axi_mm_0_awaddr),
+	.S_AXI_AWLEN(s_axi_mm_0_awlen),
+	.S_AXI_AWSIZE(s_axi_mm_0_awsize),
+	.S_AXI_AWBURST(s_axi_mm_0_awburst),
+	.S_AXI_AWLOCK(s_axi_mm_0_awlock),
+	.S_AXI_AWCACHE(s_axi_mm_0_awcache),
+	.S_AXI_AWPROT(s_axi_mm_0_awprot),
+	.S_AXI_AWQOS(s_axi_mm_0_awqos),
+	.S_AXI_AWREGION(s_axi_mm_0_awregion),
+	.S_AXI_AWUSER(s_axi_mm_0_awuser),
+	.S_AXI_AWVALID(s_axi_mm_0_awvalid),
+	.S_AXI_AWREADY(s_axi_mm_0_awready),
+	.S_AXI_WDATA(s_axi_mm_0_wdata),
+	.S_AXI_WSTRB(s_axi_mm_0_wstrb),
+	.S_AXI_WLAST(s_axi_mm_0_wlast),
+	.S_AXI_WUSER(s_axi_mm_0_wuser),
+	.S_AXI_WVALID(s_axi_mm_0_wvalid),
+	.S_AXI_WREADY(s_axi_mm_0_wready),
+	.S_AXI_BID(s_axi_mm_0_bid),
+	.S_AXI_BRESP(s_axi_mm_0_bresp),
+	.S_AXI_BUSER(s_axi_mm_0_buser),
+	.S_AXI_BVALID(s_axi_mm_0_bvalid),
+	.S_AXI_BREADY(s_axi_mm_0_bready),
+	.S_AXI_ARID(s_axi_mm_0_arid),
+	.S_AXI_ARADDR(s_axi_mm_0_araddr),
+	.S_AXI_ARLEN(s_axi_mm_0_arlen),
+	.S_AXI_ARSIZE(s_axi_mm_0_arsize),
+	.S_AXI_ARBURST(s_axi_mm_0_arburst),
+	.S_AXI_ARLOCK(s_axi_mm_0_arlock),
+	.S_AXI_ARCACHE(s_axi_mm_0_arcache),
+	.S_AXI_ARPROT(s_axi_mm_0_arprot),
+	.S_AXI_ARQOS(s_axi_mm_0_arqos),
+	.S_AXI_ARREGION(s_axi_mm_0_arregion),
+	.S_AXI_ARUSER(s_axi_mm_0_aruser),
+	.S_AXI_ARVALID(s_axi_mm_0_arvalid),
+	.S_AXI_ARREADY(s_axi_mm_0_arready),
+	.S_AXI_RID(s_axi_mm_0_rid),
+	.S_AXI_RDATA(s_axi_mm_0_rdata),
+	.S_AXI_RRESP(s_axi_mm_0_rresp),
+	.S_AXI_RLAST(s_axi_mm_0_rlast),
+	.S_AXI_RUSER(s_axi_mm_0_ruser),
+	.S_AXI_RVALID(s_axi_mm_0_rvalid),
+	.S_AXI_RREADY(s_axi_mm_0_rready)
+	);
+   
+   // Instantiation of Axi Bus Interface S_AXI_MM_1
+   // From consumer to syn_ip
+
+   generate
+      if (C_CONSUMER_PORT > 1) begin: gen_consumer_port_1
+	 
+	 syn_ip_v1_0_S_AXI_MM # 
+	   ( 
+	     .C_VIDEO_CHAN (C_VIDEO_CHAN),
+	     .C_VIDEO_CHAN_ID (1),
+	     .C_CONSUMER_CHAN (C_CONSUMER_CHAN_PER_PORT),
+	     .C_DEC_ENC_N (C_DEC_ENC_N),
+	     .C_SRC_FRAME_DETECT (C_SRC_FRAME_DETECT),
+	     .C_FRMBUF_ADDR_WIDTH (C_FRMBUF_ADDR_WIDTH),
+	     .C_TIMEOUT    (C_CONSUMER_TIMEOUT),
+             .C_RD_BUF_CNT_WIDTH (C_RD_BUF_CNT_WIDTH),
+             .C_BUF_CNT_WIDTH    (C_BUF_CNT_WIDTH),
+             .C_BL_WIDTH         (C_BL_WIDTH),
+       
+
+	     .C_S_AXI_ID_WIDTH(C_S_AXI_MM_1_ID_WIDTH),
+	     .C_S_AXI_DATA_WIDTH(C_S_AXI_MM_1_DATA_WIDTH),
+	     .C_S_AXI_ADDR_WIDTH(C_S_AXI_MM_1_ADDR_WIDTH),
+	     .C_S_AXI_AWUSER_WIDTH(C_S_AXI_MM_1_AWUSER_WIDTH),
+	     .C_S_AXI_ARUSER_WIDTH(C_S_AXI_MM_1_ARUSER_WIDTH),
+	     .C_S_AXI_WUSER_WIDTH(C_S_AXI_MM_1_WUSER_WIDTH),
+	     .C_S_AXI_RUSER_WIDTH(C_S_AXI_MM_1_RUSER_WIDTH),
+	     .C_S_AXI_BUSER_WIDTH(C_S_AXI_MM_1_BUSER_WIDTH)
+	     )  syn_ip_v1_0_S_AXI_MM_1_inst 
+	     (
+              .S_AXI_SW_ARESET (S_AXI_SW_ARESET),
+              .buf_rd_cnt_en   (buf_rd_cnt_en),
+	      .producer_aclk (producer_aclk),
+	      .producer_aresetn (producer_aresetn),
+	      .prod_luma_frmbuf_addr_done (prod_luma_frmbuf_addr_done_0
+					   | prod_luma_frmbuf_addr_done_1
+					   | prod_luma_frmbuf_addr_done_2
+					   | prod_luma_frmbuf_addr_done_3), // flush command from producer
+	      .prod_luma_frmbuf_c0_addr_done (prod_luma_frmbuf_c0_addr_done_0
+					   | prod_luma_frmbuf_c0_addr_done_1
+					   | prod_luma_frmbuf_c0_addr_done_2
+					   | prod_luma_frmbuf_c0_addr_done_3), // flush command from producer//####
+	      .prod_luma_frmbuf_c1_addr_done (prod_luma_frmbuf_c1_addr_done_0
+					   | prod_luma_frmbuf_c1_addr_done_1
+					   | prod_luma_frmbuf_c1_addr_done_2
+					   | prod_luma_frmbuf_c1_addr_done_3), // flush command from producer//####
+	      .prod_luma_frmbuf_c2_addr_done (prod_luma_frmbuf_c2_addr_done_0
+					   | prod_luma_frmbuf_c2_addr_done_1
+					   | prod_luma_frmbuf_c2_addr_done_2
+					   | prod_luma_frmbuf_c2_addr_done_3), // flush command from producer//####
+	      .prod_luma_frmbuf_c3_addr_done (prod_luma_frmbuf_c3_addr_done_0
+					   | prod_luma_frmbuf_c3_addr_done_1
+					   | prod_luma_frmbuf_c3_addr_done_2
+					   | prod_luma_frmbuf_c3_addr_done_3), // flush command from producer//####
+	      .prod_luma_frmbuf_addr_outthres (prod_luma_frmbuf_addr_outthres),
+	      .prod_luma_frmbuf_addr_outthres_valid_pulse (prod_luma_frmbuf_addr_outthres_valid_pulse),
+	      
+	      .prod_chroma_frmbuf_addr_done (prod_chroma_frmbuf_addr_done_0
+					     | prod_chroma_frmbuf_addr_done_1
+					     | prod_chroma_frmbuf_addr_done_2
+					     | prod_chroma_frmbuf_addr_done_3),
+	      .prod_chroma_frmbuf_c0_addr_done (prod_chroma_frmbuf_c0_addr_done_0
+					     | prod_chroma_frmbuf_c0_addr_done_1
+					     | prod_chroma_frmbuf_c0_addr_done_2
+					     | prod_chroma_frmbuf_c0_addr_done_3),//####
+	      .prod_chroma_frmbuf_c1_addr_done (prod_chroma_frmbuf_c1_addr_done_0
+					     | prod_chroma_frmbuf_c1_addr_done_1
+					     | prod_chroma_frmbuf_c1_addr_done_2
+					     | prod_chroma_frmbuf_c1_addr_done_3),//####
+	      .prod_chroma_frmbuf_c2_addr_done (prod_chroma_frmbuf_c2_addr_done_0
+					     | prod_chroma_frmbuf_c2_addr_done_1
+					     | prod_chroma_frmbuf_c2_addr_done_2
+					     | prod_chroma_frmbuf_c2_addr_done_3),//####
+	      .prod_chroma_frmbuf_c3_addr_done (prod_chroma_frmbuf_c3_addr_done_0
+					     | prod_chroma_frmbuf_c3_addr_done_1
+					     | prod_chroma_frmbuf_c3_addr_done_2
+					     | prod_chroma_frmbuf_c3_addr_done_3),//####
+	      
+	      .prod_chroma_frmbuf_addr_outthres (prod_chroma_frmbuf_addr_outthres),
+	      
+	      .prod_chroma_frmbuf_addr_outthres_valid_pulse (prod_chroma_frmbuf_addr_outthres_valid_pulse),
+	      
+	      
+	      .ctrl_aclk          (s_axi_ctrl_aclk),
+	      .ctrl_aresetn       (s_axi_ctrl_aresetn),
+	      .en                 (en),
+	      .luma_frmbuf_start_addr  (cons_luma_frmbuf_start_addr),
+	      .luma_frmbuf_end_addr    (cons_luma_frmbuf_end_addr),
+	      .luma_frmbuf_addr_valid_pulse  (cons_luma_frmbuf_addr_valid_pulse),
+
+	      .chroma_frmbuf_start_addr  (cons_chroma_frmbuf_start_addr),
+	      .chroma_frmbuf_end_addr    (cons_chroma_frmbuf_end_addr),
+	      .chroma_frmbuf_addr_valid_pulse  (cons_chroma_frmbuf_addr_valid_pulse),
+
+
+              .cons_luma_buf_rd_cnt_in (cons_luma_buf_rd_cnt0), 
+              .cons_chroma_buf_rd_cnt_in (cons_chroma_buf_rd_cnt0), 
+              .cons_luma_buf_rd_cnt_out (cons_luma_buf_rd_cnt1), 
+              .cons_chroma_buf_rd_cnt_out (cons_chroma_buf_rd_cnt1), 
+
+	      .prod_luma_buf_id(prod_luma_buf_id),     //####Addition of Buffer id signals
+	      .prod_chroma_buf_id(prod_chroma_buf_id), //####Addition of Buffer id signals
+	      .cons_luma_buf_id(cons_luma_buf_id),     //####Addition of Buffer id signals
+	      .cons_chroma_buf_id(cons_chroma_buf_id), //####Addition of Buffer id signals
+
+         .cons_luma_frmbuf_addr_done_in ((cons_luma_frmbuf_addr_done_0 |
+                                          cons_luma_frmbuf_addr_done_1 )), 
+         .cons_chroma_frmbuf_addr_done_in ((cons_chroma_frmbuf_addr_done_0 |
+                                            cons_chroma_frmbuf_addr_done_1 )), 
+
+
+	      .luma_frmbuf_addr_next    (cons_luma_frmbuf_addr_next_1[C_VIDEO_CHAN-1:0]),
+	      .luma_frmbuf_addr_done    (cons_luma_frmbuf_addr_done_1[C_VIDEO_CHAN-1:0]),
+
+	      .chroma_frmbuf_addr_next    (cons_chroma_frmbuf_addr_next_1[C_VIDEO_CHAN-1:0]),
+	      .chroma_frmbuf_addr_done    (cons_chroma_frmbuf_addr_done_1[C_VIDEO_CHAN-1:0]),
+
+	      .luma_outofrange         (cons_luma_outofrange_1), // O
+	      .chroma_outofrange       (cons_chroma_outofrange_1), // O
+	      .luma_timeout            (cons_luma_timeout_1), // O
+	      .chroma_timeout          (cons_chroma_timeout_1), // O
+	
+              .luma_c0_offset          ({32{1'b0}} ),//#### Addition of offset signals
+              .luma_c1_offset          ({32{1'b0}} ),//#### Addition of offset signals
+              .luma_c2_offset          ({32{1'b0}} ),//#### Addition of offset signals
+              .luma_c3_offset          ({32{1'b0}} ),//#### Addition of offset signals
+              .chroma_c0_offset        ({32{1'b0}} ),//#### Addition of offset signals
+              .chroma_c1_offset        ({32{1'b0}} ),//#### Addition of offset signals
+              .chroma_c2_offset        ({32{1'b0}} ),//#### Addition of offset signals
+              .chroma_c3_offset        ({32{1'b0}} ),//#### Addition of offset signals
+      
+	      .m_axi_arid          (m_axi_arid_1),
+	      .m_axi_araddr        (m_axi_araddr_1),
+	      .m_axi_arlen         (m_axi_arlen_1),
+	      .m_axi_arsize        (m_axi_arsize_1),
+	      .m_axi_arburst       (m_axi_arburst_1),
+	      .m_axi_arlock        (m_axi_arlock_1),
+	      .m_axi_arcache       (m_axi_arcache_1),
+	      .m_axi_arprot        (m_axi_arprot_1),
+	      .m_axi_arregion      (m_axi_arregion_1),
+	      .m_axi_arqos         (m_axi_arqos_1),
+	      .m_axi_arvalid       (m_axi_arvalid_1),
+	      .m_axi_arready       (m_axi_arready_1),
+	      .m_axi_rid           (m_axi_rid_1),
+	      .m_axi_rdata         (m_axi_rdata_1),
+	      .m_axi_rresp         (m_axi_rresp_1),
+	      .m_axi_rlast         (m_axi_rlast_1),
+	      .m_axi_rvalid        (m_axi_rvalid_1),
+	      .m_axi_rready        (m_axi_rready_1),
+
+	      .m_axi_awid          (m_axi_awid_1),
+	      .m_axi_awaddr        (m_axi_awaddr_1),
+	      .m_axi_awlen         (m_axi_awlen_1),
+	      .m_axi_awsize        (m_axi_awsize_1),
+	      .m_axi_awburst       (m_axi_awburst_1),
+	      .m_axi_awlock        (m_axi_awlock_1),
+	      .m_axi_awcache       (m_axi_awcache_1),
+	      .m_axi_awprot        (m_axi_awprot_1),
+	      .m_axi_awregion      (m_axi_awregion_1),
+	      .m_axi_awqos         (m_axi_awqos_1),
+	      .m_axi_awvalid       (m_axi_awvalid_1),
+	      .m_axi_awready       (m_axi_awready_1),
+	      .m_axi_wdata         (m_axi_wdata_1),
+	      .m_axi_wstrb         (m_axi_wstrb_1),
+	      .m_axi_wlast         (m_axi_wlast_1),
+	      .m_axi_wvalid        (m_axi_wvalid_1),
+	      .m_axi_wready        (m_axi_wready_1),
+	      .m_axi_bid           (m_axi_bid_1),
+	      .m_axi_bresp         (m_axi_bresp_1),
+	      .m_axi_bvalid        (m_axi_bvalid_1),
+	      .m_axi_bready        (m_axi_bready_1),
+
+	      .S_AXI_ACLK(s_axi_mm_1_aclk),
+	      .S_AXI_ARESETN(s_axi_mm_1_aresetn),
+	      .S_AXI_AWID(s_axi_mm_1_awid),
+	      .S_AXI_AWADDR(s_axi_mm_1_awaddr),
+	      .S_AXI_AWLEN(s_axi_mm_1_awlen),
+	      .S_AXI_AWSIZE(s_axi_mm_1_awsize),
+	      .S_AXI_AWBURST(s_axi_mm_1_awburst),
+	      .S_AXI_AWLOCK(s_axi_mm_1_awlock),
+	      .S_AXI_AWCACHE(s_axi_mm_1_awcache),
+	      .S_AXI_AWPROT(s_axi_mm_1_awprot),
+	      .S_AXI_AWQOS(s_axi_mm_1_awqos),
+	      .S_AXI_AWREGION(s_axi_mm_1_awregion),
+	      .S_AXI_AWUSER(s_axi_mm_1_awuser),
+	      .S_AXI_AWVALID(s_axi_mm_1_awvalid),
+	      .S_AXI_AWREADY(s_axi_mm_1_awready),
+	      .S_AXI_WDATA(s_axi_mm_1_wdata),
+	      .S_AXI_WSTRB(s_axi_mm_1_wstrb),
+	      .S_AXI_WLAST(s_axi_mm_1_wlast),
+	      .S_AXI_WUSER(s_axi_mm_1_wuser),
+	      .S_AXI_WVALID(s_axi_mm_1_wvalid),
+	      .S_AXI_WREADY(s_axi_mm_1_wready),
+	      .S_AXI_BID(s_axi_mm_1_bid),
+	      .S_AXI_BRESP(s_axi_mm_1_bresp),
+	      .S_AXI_BUSER(s_axi_mm_1_buser),
+	      .S_AXI_BVALID(s_axi_mm_1_bvalid),
+	      .S_AXI_BREADY(s_axi_mm_1_bready),
+	      .S_AXI_ARID(s_axi_mm_1_arid),
+	      .S_AXI_ARADDR(s_axi_mm_1_araddr),
+	      .S_AXI_ARLEN(s_axi_mm_1_arlen),
+	      .S_AXI_ARSIZE(s_axi_mm_1_arsize),
+	      .S_AXI_ARBURST(s_axi_mm_1_arburst),
+	      .S_AXI_ARLOCK(s_axi_mm_1_arlock),
+	      .S_AXI_ARCACHE(s_axi_mm_1_arcache),
+	      .S_AXI_ARPROT(s_axi_mm_1_arprot),
+	      .S_AXI_ARQOS(s_axi_mm_1_arqos),
+	      .S_AXI_ARREGION(s_axi_mm_1_arregion),
+	      .S_AXI_ARUSER(s_axi_mm_1_aruser),
+	      .S_AXI_ARVALID(s_axi_mm_1_arvalid),
+	      .S_AXI_ARREADY(s_axi_mm_1_arready),
+	      .S_AXI_RID(s_axi_mm_1_rid),
+	      .S_AXI_RDATA(s_axi_mm_1_rdata),
+	      .S_AXI_RRESP(s_axi_mm_1_rresp),
+	      .S_AXI_RLAST(s_axi_mm_1_rlast),
+	      .S_AXI_RUSER(s_axi_mm_1_ruser),
+	      .S_AXI_RVALID(s_axi_mm_1_rvalid),
+	      .S_AXI_RREADY(s_axi_mm_1_rready)
+	      );
+	 
+      end // block: gen_consumer_port_1
+      else begin: no_consumer_port_1
+
+	 assign cons_luma_frmbuf_addr_next_1 = 0;
+	 assign cons_chroma_frmbuf_addr_next_1 = 0;
+	 assign cons_luma_frmbuf_addr_done_1 = 0;
+	 assign cons_chroma_frmbuf_addr_done_1 = 0;
+	 assign cons_luma_outofrange_1 = 0;
+	 assign cons_chroma_outofrange_1 = 0;
+	 assign cons_luma_timeout_1 = 0;
+	 assign cons_chroma_timeout_1 = 0;
+
+	 assign m_axi_arid_1 = 0;
+	 assign m_axi_araddr_1 = 0;
+	 assign m_axi_arlen_1 = 0;
+	 assign m_axi_arsize_1 = 0;
+	 assign m_axi_arburst_1 = 0;
+	 assign m_axi_arlock_1 = 0;
+	 assign m_axi_arcache_1 = 0;
+	 assign m_axi_arprot_1 = 0;
+	 assign m_axi_arregion_1 = 0;
+	 assign m_axi_arqos_1 = 0;
+	 assign m_axi_arvalid_1 = 0;
+	 assign m_axi_rready_1 = 0;
+	 
+	 assign m_axi_awid_1 = 0;
+	 assign m_axi_awaddr_1 = 0;
+	 assign m_axi_awlen_1 = 0;
+	 assign m_axi_awsize_1 = 0;
+	 assign m_axi_awburst_1 = 0;
+	 assign m_axi_awlock_1 = 0;
+	 assign m_axi_awcache_1 = 0;
+	 assign m_axi_awprot_1 = 0;
+	 assign m_axi_awregion_1 = 0;
+	 assign m_axi_awqos_1 = 0;
+	 assign m_axi_awvalid_1 = 0;
+	 assign m_axi_wdata_1 = 0;
+	 assign m_axi_wstrb_1 = 0;
+	 assign m_axi_wlast_1 = 0;
+	 assign m_axi_wvalid_1 = 0;
+	 assign m_axi_bready_1 = 0;
+
+	 assign s_axi_mm_1_awready = 0;
+	 assign s_axi_mm_1_wready = 0;
+	 assign s_axi_mm_1_bid = 0;
+	 assign s_axi_mm_1_bresp = 0;
+	 assign s_axi_mm_1_buser = 0;
+	 assign s_axi_mm_1_bvalid = 0;
+	 assign s_axi_mm_1_arready = 0;
+	 assign s_axi_mm_1_rid = 0;
+	 assign s_axi_mm_1_rdata = 0;
+	 assign s_axi_mm_1_rresp = 0;
+	 assign s_axi_mm_1_rlast = 0;
+	 assign s_axi_mm_1_ruser = 0;
+	 assign s_axi_mm_1_rvalid = 0;
+	 
+	 
+      end
+   endgenerate
+
+
+   always @ (posedge consumer_aclk)
+   begin
+     if (~consumer_aresetn)
+     begin
+       cons_luma_frmbuf_addr_next_0_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       cons_luma_frmbuf_addr_next_1_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       cons_luma_frmbuf_addr_done_0_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       cons_luma_frmbuf_addr_done_1_rg   <=  {C_VIDEO_CHAN{1'b0}};
+
+       cons_chroma_frmbuf_addr_next_0_rg <=  {C_VIDEO_CHAN{1'b0}};
+       cons_chroma_frmbuf_addr_next_1_rg <=  {C_VIDEO_CHAN{1'b0}};
+       cons_chroma_frmbuf_addr_done_0_rg <=  {C_VIDEO_CHAN{1'b0}};
+       cons_chroma_frmbuf_addr_done_1_rg <=  {C_VIDEO_CHAN{1'b0}};
+
+       cons_luma_outofrange_0_rg         <=  {C_VIDEO_CHAN{1'b0}};
+       cons_chroma_outofrange_0_rg       <=  {C_VIDEO_CHAN{1'b0}};
+       cons_luma_timeout_0_rg            <=  {C_VIDEO_CHAN{1'b0}};
+       cons_chroma_timeout_0_rg          <=  {C_VIDEO_CHAN{1'b0}};
+
+       cons_luma_outofrange_1_rg         <=  {C_VIDEO_CHAN{1'b0}};
+       cons_chroma_outofrange_1_rg       <=  {C_VIDEO_CHAN{1'b0}};
+       cons_luma_timeout_1_rg            <=  {C_VIDEO_CHAN{1'b0}};
+       cons_chroma_timeout_1_rg          <=  {C_VIDEO_CHAN{1'b0}};
+
+       cons_err_syncfail_rg              <=  {C_VIDEO_CHAN{1'b0}};
+       cons_err_wdt_rg                   <=  {C_VIDEO_CHAN{1'b0}};
+     end
+     else
+     begin
+       cons_luma_frmbuf_addr_next_0_rg   <=  cons_luma_frmbuf_addr_next_0;
+       cons_luma_frmbuf_addr_next_1_rg   <=  cons_luma_frmbuf_addr_next_1;
+       cons_luma_frmbuf_addr_done_0_rg   <=  cons_luma_frmbuf_addr_done_0;
+       cons_luma_frmbuf_addr_done_1_rg   <=  cons_luma_frmbuf_addr_done_1;
+
+       cons_chroma_frmbuf_addr_next_0_rg <=  cons_chroma_frmbuf_addr_next_0;
+       cons_chroma_frmbuf_addr_next_1_rg <=  cons_chroma_frmbuf_addr_next_1;
+       cons_chroma_frmbuf_addr_done_0_rg <=  cons_chroma_frmbuf_addr_done_0;
+       cons_chroma_frmbuf_addr_done_1_rg <=  cons_chroma_frmbuf_addr_done_1;
+
+       cons_luma_outofrange_0_rg         <=  cons_luma_outofrange_0;
+       cons_chroma_outofrange_0_rg       <=  cons_chroma_outofrange_0;
+       cons_luma_timeout_0_rg            <=  cons_luma_timeout_0;
+       cons_chroma_timeout_0_rg          <=  cons_chroma_timeout_0;
+
+       cons_luma_outofrange_1_rg         <=  cons_luma_outofrange_1;
+       cons_chroma_outofrange_1_rg       <=  cons_chroma_outofrange_1;
+       cons_luma_timeout_1_rg            <=  cons_luma_timeout_1;
+       cons_chroma_timeout_1_rg          <=  cons_chroma_timeout_1;
+
+       cons_err_syncfail_rg              <=  cons_err_syncfail;
+       cons_err_wdt_rg                   <=  cons_err_wdt;
+     end
+   end
+
+   always @ (posedge producer_aclk)
+   begin
+     if (~producer_aresetn)
+     begin
+       prod_luma_frmbuf_addr_next_0_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       prod_luma_frmbuf_addr_next_1_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       prod_luma_frmbuf_addr_next_2_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       prod_luma_frmbuf_addr_next_3_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       prod_luma_frmbuf_addr_done_0_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       prod_luma_frmbuf_addr_done_1_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       prod_luma_frmbuf_addr_done_2_rg   <=  {C_VIDEO_CHAN{1'b0}};
+       prod_luma_frmbuf_addr_done_3_rg   <=  {C_VIDEO_CHAN{1'b0}};
+
+       prod_chroma_frmbuf_addr_next_0_rg <=  {C_VIDEO_CHAN{1'b0}};
+       prod_chroma_frmbuf_addr_next_1_rg <=  {C_VIDEO_CHAN{1'b0}};
+       prod_chroma_frmbuf_addr_next_2_rg <=  {C_VIDEO_CHAN{1'b0}};
+       prod_chroma_frmbuf_addr_next_3_rg <=  {C_VIDEO_CHAN{1'b0}};
+       prod_chroma_frmbuf_addr_done_0_rg <=  {C_VIDEO_CHAN{1'b0}};
+       prod_chroma_frmbuf_addr_done_1_rg <=  {C_VIDEO_CHAN{1'b0}};
+       prod_chroma_frmbuf_addr_done_2_rg <=  {C_VIDEO_CHAN{1'b0}};
+       prod_chroma_frmbuf_addr_done_3_rg <=  {C_VIDEO_CHAN{1'b0}};
+
+       prod_err_syncfail_rg              <=  {C_VIDEO_CHAN{1'b0}};
+       prod_err_wdt_rg                   <=  {C_VIDEO_CHAN{1'b0}};
+     end
+     else
+     begin
+       prod_luma_frmbuf_addr_next_0_rg   <=  prod_luma_frmbuf_addr_next_0;
+       prod_luma_frmbuf_addr_next_1_rg   <=  prod_luma_frmbuf_addr_next_1;
+       prod_luma_frmbuf_addr_next_2_rg   <=  prod_luma_frmbuf_addr_next_2;
+       prod_luma_frmbuf_addr_next_3_rg   <=  prod_luma_frmbuf_addr_next_3;
+       prod_luma_frmbuf_addr_done_0_rg   <=  prod_luma_frmbuf_addr_done_0;
+       prod_luma_frmbuf_addr_done_1_rg   <=  prod_luma_frmbuf_addr_done_1;
+       prod_luma_frmbuf_addr_done_2_rg   <=  prod_luma_frmbuf_addr_done_2;
+       prod_luma_frmbuf_addr_done_3_rg   <=  prod_luma_frmbuf_addr_done_3;
+
+       prod_chroma_frmbuf_addr_next_0_rg <=  prod_chroma_frmbuf_addr_next_0;
+       prod_chroma_frmbuf_addr_next_1_rg <=  prod_chroma_frmbuf_addr_next_1;
+       prod_chroma_frmbuf_addr_next_2_rg <=  prod_chroma_frmbuf_addr_next_2;
+       prod_chroma_frmbuf_addr_next_3_rg <=  prod_chroma_frmbuf_addr_next_3;
+       prod_chroma_frmbuf_addr_done_0_rg <=  prod_chroma_frmbuf_addr_done_0;
+       prod_chroma_frmbuf_addr_done_1_rg <=  prod_chroma_frmbuf_addr_done_1;
+       prod_chroma_frmbuf_addr_done_2_rg <=  prod_chroma_frmbuf_addr_done_2;
+       prod_chroma_frmbuf_addr_done_3_rg <=  prod_chroma_frmbuf_addr_done_3;
+
+       prod_err_syncfail_rg              <=  prod_err_syncfail;
+       prod_err_wdt_rg                   <=  prod_err_wdt;
+     end
+   end
+
+
+   // Output threshold aggregation from multiple producer ports
+
+   genvar i;
+   
+   
+   generate
+      if (C_DEC_ENC_N == 0) begin: gen_outthres_enc
+
+	 always @(*) begin
+	//    prod_luma_frmbuf_addr_outthres =  prod_luma_frmbuf_addr_outthres_0
+	//				      | prod_luma_frmbuf_addr_outthres_1
+	//				      | prod_luma_frmbuf_addr_outthres_2
+	//				      | prod_luma_frmbuf_addr_outthres_3;
+	   
+        //    prod_luma_frmbuf_addr_outthres  = { ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}),({C_FRMBUF_ADDR_WIDTH{1'b0}}),(prod_luma_frmbuf_addr_outthres_0[0 +: C_FRMBUF_ADDR_WIDTH]) } |
+        //                                      { ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}), (prod_luma_frmbuf_addr_outthres_1[C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH]), ({C_FRMBUF_ADDR_WIDTH{1'b0}}) } |
+        //                                      { ({C_FRMBUF_ADDR_WIDTH{1'b0}}), (prod_luma_frmbuf_addr_outthres_2[(C_FRMBUF_ADDR_WIDTH*2) +: C_FRMBUF_ADDR_WIDTH]), ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}) } |
+        //                                      { (prod_luma_frmbuf_addr_outthres_3[(C_FRMBUF_ADDR_WIDTH*3) +: C_FRMBUF_ADDR_WIDTH]), ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}) } ;
+
+            prod_luma_frmbuf_addr_outthres  = { (prod_luma_frmbuf_addr_outthres_3[(C_FRMBUF_ADDR_WIDTH*3) +: C_FRMBUF_ADDR_WIDTH]),
+                                                (prod_luma_frmbuf_addr_outthres_2[(C_FRMBUF_ADDR_WIDTH*2) +: C_FRMBUF_ADDR_WIDTH]),
+                                                (prod_luma_frmbuf_addr_outthres_1[ C_FRMBUF_ADDR_WIDTH    +: C_FRMBUF_ADDR_WIDTH]),
+                                                (prod_luma_frmbuf_addr_outthres_0[0 +: C_FRMBUF_ADDR_WIDTH]) };
+
+	    prod_luma_frmbuf_addr_outthres_valid_pulse = prod_luma_frmbuf_addr_outthres_valid_pulse_0
+							 | prod_luma_frmbuf_addr_outthres_valid_pulse_1
+							 | prod_luma_frmbuf_addr_outthres_valid_pulse_2
+							 | prod_luma_frmbuf_addr_outthres_valid_pulse_3;
+	    
+//	    prod_chroma_frmbuf_addr_outthres =  prod_chroma_frmbuf_addr_outthres_0
+//						| prod_chroma_frmbuf_addr_outthres_1
+//						| prod_chroma_frmbuf_addr_outthres_2
+//						| prod_chroma_frmbuf_addr_outthres_3;
+
+//            prod_chroma_frmbuf_addr_outthres  = { ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}),({C_FRMBUF_ADDR_WIDTH{1'b0}}),(prod_chroma_frmbuf_addr_outthres_0[0 +: C_FRMBUF_ADDR_WIDTH]) } |
+//                                              { ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}), (prod_chroma_frmbuf_addr_outthres_1[C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH]), ({C_FRMBUF_ADDR_WIDTH{1'b0}}) } |
+//                                              { ({C_FRMBUF_ADDR_WIDTH{1'b0}}), (prod_chroma_frmbuf_addr_outthres_2[(C_FRMBUF_ADDR_WIDTH*2) +: C_FRMBUF_ADDR_WIDTH]), ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}) } |
+//                                              { (prod_chroma_frmbuf_addr_outthres_3[(C_FRMBUF_ADDR_WIDTH*3) +: C_FRMBUF_ADDR_WIDTH]), ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}), ({C_FRMBUF_ADDR_WIDTH{1'b0}}) } ;
+
+            prod_chroma_frmbuf_addr_outthres  = { (prod_chroma_frmbuf_addr_outthres_3[(C_FRMBUF_ADDR_WIDTH*3) +: C_FRMBUF_ADDR_WIDTH]),
+                                                  (prod_chroma_frmbuf_addr_outthres_2[(C_FRMBUF_ADDR_WIDTH*2) +: C_FRMBUF_ADDR_WIDTH]),
+                                                  (prod_chroma_frmbuf_addr_outthres_1[ C_FRMBUF_ADDR_WIDTH    +: C_FRMBUF_ADDR_WIDTH]),
+                                                  (prod_chroma_frmbuf_addr_outthres_0[0 +: C_FRMBUF_ADDR_WIDTH]) };
+
+
+	    prod_chroma_frmbuf_addr_outthres_valid_pulse = prod_chroma_frmbuf_addr_outthres_valid_pulse_0
+							   | prod_chroma_frmbuf_addr_outthres_valid_pulse_1
+							   | prod_chroma_frmbuf_addr_outthres_valid_pulse_2
+							   | prod_chroma_frmbuf_addr_outthres_valid_pulse_3;
+	 end // always @ (*)
+	 
+
+      end // block: gen_outthres_enc
+      else begin: gen_outthres_dec
+
+	 wire [C_VIDEO_CHAN-1:0] int_cons_luma_frmbuf_addr_done;
+	 wire [C_VIDEO_CHAN-1:0] int_cons_chroma_frmbuf_addr_done;
+
+
+
+	 for ( i = 0; i < C_VIDEO_CHAN; i=i+1) begin: gen_vchan
+	    
+	       pulse_crossing cons_luma_frmbuf_addr_done_sync (.i (cons_luma_frmbuf_addr_done_0[i] | cons_luma_frmbuf_addr_done_1[i]),
+							       .i_clk (consumer_aclk), 
+							       .i_arst_n (consumer_aresetn),
+							       .o_arst_n (producer_aresetn),
+							       .o_clk (producer_aclk),  
+							       .o (int_cons_luma_frmbuf_addr_done[i]));
+
+
+	       pulse_crossing cons_chroma_frmbuf_addr_done_sync (.i (cons_chroma_frmbuf_addr_done_0[i] | cons_chroma_frmbuf_addr_done_1[i]),
+								 .i_clk (consumer_aclk), 
+								 .i_arst_n (consumer_aresetn),
+								 .o_arst_n (producer_aresetn),
+								 .o_clk (producer_aclk),  
+								 .o (int_cons_chroma_frmbuf_addr_done[i]));
+
+
+	    always @(posedge producer_aclk) begin
+	       
+	       prod_luma_frmbuf_addr_outthres_valid_pulse[i] <= {C_VIDEO_CHAN{1'b0}};
+	    
+	       if (int_cons_luma_frmbuf_addr_done[i]) begin
+		  prod_luma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= {C_FRMBUF_ADDR_WIDTH{1'b0}};
+	       end
+	       else if (prod_luma_frmbuf_addr_outthres_valid_pulse_0[i] & prod_luma_frmbuf_addr_outthres_valid_pulse_1[i]) begin
+		  prod_luma_frmbuf_addr_outthres_valid_pulse[i] <= 1'b1;
+		  if (prod_luma_frmbuf_addr_outthres_0[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] > prod_luma_frmbuf_addr_outthres_1[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH])
+		    prod_luma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= prod_luma_frmbuf_addr_outthres_0[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH];
+		  else
+		    prod_luma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= prod_luma_frmbuf_addr_outthres_1[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH];
+	       end
+	       else if (prod_luma_frmbuf_addr_outthres_valid_pulse_0[i]) begin
+		  prod_luma_frmbuf_addr_outthres_valid_pulse[i] <= 1'b1;
+		  if (prod_luma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <  prod_luma_frmbuf_addr_outthres_0[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH])
+		    prod_luma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= prod_luma_frmbuf_addr_outthres_0[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH];
+	       end
+	       else if (prod_luma_frmbuf_addr_outthres_valid_pulse_1[i]) begin
+		  prod_luma_frmbuf_addr_outthres_valid_pulse[i] <= 1'b1;
+		  if (prod_luma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] < prod_luma_frmbuf_addr_outthres_1[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH])
+		    prod_luma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= prod_luma_frmbuf_addr_outthres_1[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH];
+	       end
+	    
+
+	       prod_chroma_frmbuf_addr_outthres_valid_pulse[i] <= {C_VIDEO_CHAN{1'b0}};
+	    
+	       if (int_cons_chroma_frmbuf_addr_done[i]) begin
+		  prod_chroma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= {C_FRMBUF_ADDR_WIDTH{1'b0}};
+	       end
+	       else if (prod_chroma_frmbuf_addr_outthres_valid_pulse_0[i] & prod_chroma_frmbuf_addr_outthres_valid_pulse_1[i]) begin
+		  prod_chroma_frmbuf_addr_outthres_valid_pulse[i] <= 1'b1;
+		  if (prod_chroma_frmbuf_addr_outthres_0[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] > prod_chroma_frmbuf_addr_outthres_1[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH])
+		    prod_chroma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= prod_chroma_frmbuf_addr_outthres_0[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH];
+		  else
+		    prod_chroma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= prod_chroma_frmbuf_addr_outthres_1[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH];
+	       end
+	       else if (prod_chroma_frmbuf_addr_outthres_valid_pulse_0[i]) begin
+		  prod_chroma_frmbuf_addr_outthres_valid_pulse[i] <= 1'b1;
+		  if (prod_chroma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] < prod_chroma_frmbuf_addr_outthres_0[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH])
+		    prod_chroma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= prod_chroma_frmbuf_addr_outthres_0[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH];
+	       end
+	       else if (prod_chroma_frmbuf_addr_outthres_valid_pulse_1[i]) begin
+		  prod_chroma_frmbuf_addr_outthres_valid_pulse[i] <= 1'b1;
+		  if (prod_chroma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] < prod_chroma_frmbuf_addr_outthres_1[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH])
+		  prod_chroma_frmbuf_addr_outthres[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH] <= prod_chroma_frmbuf_addr_outthres_1[i*C_FRMBUF_ADDR_WIDTH +: C_FRMBUF_ADDR_WIDTH];
+	       end
+
+	       
+	    end
+	    
+	 end // block: gen_vchan
+
+      end
+ 
+  endgenerate
+   
+
+   // ERROR handling
+   // --------------------
+   
+   //assign prod_err_syncfail = prod_luma_outofrange_0[C_VIDEO_CHAN-1:0] |
+   //                           prod_luma_outofrange_1[C_VIDEO_CHAN-1:0] |
+   //                           prod_luma_outofrange_2[C_VIDEO_CHAN-1:0] |
+   //                           prod_luma_outofrange_3[C_VIDEO_CHAN-1:0] |
+   //                           prod_chroma_outofrange_0[C_VIDEO_CHAN-1:0] |
+   //                           prod_chroma_outofrange_1[C_VIDEO_CHAN-1:0] |
+   //                           prod_chroma_outofrange_2[C_VIDEO_CHAN-1:0] |
+   //                           prod_chroma_outofrange_3[C_VIDEO_CHAN-1:0];
+
+   assign prod_err_syncfail = prod_outofrange_0[C_VIDEO_CHAN-1:0] |
+                              prod_outofrange_1[C_VIDEO_CHAN-1:0] |
+                              prod_outofrange_2[C_VIDEO_CHAN-1:0] |
+                              prod_outofrange_3[C_VIDEO_CHAN-1:0] ;
+	
+   assign prod_err_wdt = prod_luma_timeout_0[C_VIDEO_CHAN-1:0] |
+			 prod_luma_timeout_1[C_VIDEO_CHAN-1:0] |
+			 prod_luma_timeout_2[C_VIDEO_CHAN-1:0] |
+			 prod_luma_timeout_3[C_VIDEO_CHAN-1:0] |
+			 prod_chroma_timeout_0[C_VIDEO_CHAN-1:0] |
+			 prod_chroma_timeout_1[C_VIDEO_CHAN-1:0] |
+			 prod_chroma_timeout_2[C_VIDEO_CHAN-1:0] |
+			 prod_chroma_timeout_3[C_VIDEO_CHAN-1:0];
+   
+   assign cons_err_syncfail = cons_luma_outofrange_0[C_VIDEO_CHAN-1:0] |
+			      cons_luma_outofrange_1[C_VIDEO_CHAN-1:0] |
+			      cons_chroma_outofrange_0[C_VIDEO_CHAN-1:0] |
+			      cons_chroma_outofrange_1[C_VIDEO_CHAN-1:0];
+ 			      
+   assign cons_err_wdt = cons_luma_timeout_0[C_VIDEO_CHAN-1:0] |
+			 cons_luma_timeout_1[C_VIDEO_CHAN-1:0] |
+			 cons_chroma_timeout_0[C_VIDEO_CHAN-1:0] |
+			 cons_chroma_timeout_1[C_VIDEO_CHAN-1:0];
+   
+   
+   // DFTs
+   // --------------------
+
+   //synthesis translate_off
+
+   
+   
+   //synthesis translate_on
+   
+endmodule

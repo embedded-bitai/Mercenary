@@ -1,0 +1,46 @@
+namespace eval test_sync_ip_v1_0 {
+	
+	proc get_sub_core_name {} {
+		set sub_core_name sync_ip_v1_0_2 
+		return ${sub_core_name}_phy
+	}
+
+	
+    proc getModelPropertiesSet { properties } {
+    
+        set returnStr ""
+        foreach property $properties {
+            set subStr "CONFIG.$property {[::xit::get_property  MODELPARAM_VALUE.$property]}"
+            set returnStr "$returnStr $subStr"
+        }
+        return $returnStr
+    } 		
+
+	proc update_contents {} {
+          set sub_core1 [create_sub_core "xilinx.com:ip:axi_register_slice:2.1" axi_ar_reg_slice]
+          set sub_core2 [create_sub_core "xilinx.com:ip:fifo_generator:13.2" axi_mm_rfifo_128x100b]
+          set sub_core3 [create_sub_core "xilinx.com:ip:axis_switch:1.1" axis_switch_0]
+          
+
+
+         set_property -dict [list CONFIG.READ_WRITE_MODE {READ_ONLY} CONFIG.ADDR_WIDTH {64} CONFIG.DATA_WIDTH {128} CONFIG.ID_WIDTH {4} CONFIG.ARUSER_WIDTH {16} CONFIG.REG_R {0} CONFIG.Component_Name {axi_ar_reg_slice}] $sub_core1
+
+
+ #        set_property -dict [list CONFIG.READ_WRITE_MODE {READ_ONLY} CONFIG.ADDR_WIDTH {64} CONFIG.DATA_WIDTH {128} CONFIG.ID_WIDTH {4} CONFIG.ARUSER_WIDTH {50} CONFIG.REG_R {0} ] $sub_core1
+
+          set_property -dict [list CONFIG.INTERFACE_TYPE {AXI_MEMORY_MAPPED} CONFIG.Reset_Type {Asynchronous_Reset} CONFIG.READ_WRITE_MODE {READ_ONLY} CONFIG.ID_WIDTH {4} CONFIG.ADDRESS_WIDTH {64} CONFIG.DATA_WIDTH {128} CONFIG.ARUSER_Width {16} CONFIG.FIFO_Implementation_wach {Common_Clock_Distributed_RAM} CONFIG.Full_Threshold_Assert_Value_wach {15} CONFIG.Empty_Threshold_Assert_Value_wach {14} CONFIG.FIFO_Implementation_wdch {Common_Clock_Builtin_FIFO} CONFIG.FIFO_Implementation_wrch {Common_Clock_Distributed_RAM} CONFIG.Full_Threshold_Assert_Value_wrch {15} CONFIG.Empty_Threshold_Assert_Value_wrch {14} CONFIG.FIFO_Implementation_rach {Common_Clock_Block_RAM} CONFIG.Input_Depth_rach {128} CONFIG.Full_Threshold_Assert_Value_rach {127} CONFIG.Empty_Threshold_Assert_Value_rach {126} CONFIG.rdch_type {Pass_Through_Wire} CONFIG.FIFO_Implementation_rdch {Common_Clock_Builtin_FIFO} CONFIG.FIFO_Implementation_axis {Common_Clock_Builtin_FIFO} CONFIG.Component_Name {axi_mm_rfifo_128x100b}] $sub_core2
+
+
+ #         set_property -dict [list CONFIG.INTERFACE_TYPE {AXI_MEMORY_MAPPED} CONFIG.Reset_Type {Asynchronous_Reset} CONFIG.READ_WRITE_MODE {READ_ONLY} CONFIG.ID_WIDTH {4} CONFIG.ADDRESS_WIDTH {64} CONFIG.DATA_WIDTH {128} CONFIG.ARUSER_Width {50} CONFIG.FIFO_Implementation_wach {Common_Clock_Distributed_RAM} CONFIG.Full_Threshold_Assert_Value_wach {15} CONFIG.Empty_Threshold_Assert_Value_wach {14} CONFIG.FIFO_Implementation_wdch {Common_Clock_Builtin_FIFO} CONFIG.FIFO_Implementation_wrch {Common_Clock_Distributed_RAM} CONFIG.Full_Threshold_Assert_Value_wrch {15} CONFIG.Empty_Threshold_Assert_Value_wrch {14} CONFIG.FIFO_Implementation_rach {Common_Clock_Block_RAM} CONFIG.Input_Depth_rach {128} CONFIG.Full_Threshold_Assert_Value_rach {127} CONFIG.Empty_Threshold_Assert_Value_rach {126} CONFIG.rdch_type {Pass_Through_Wire} CONFIG.FIFO_Implementation_rdch {Common_Clock_Builtin_FIFO} CONFIG.FIFO_Implementation_axis {Common_Clock_Builtin_FIFO}] $sub_core2
+
+
+        set_property -dict [list CONFIG.NUM_SI {3} CONFIG.TDATA_NUM_BYTES {12} CONFIG.HAS_TKEEP {1} CONFIG.HAS_TLAST {1} CONFIG.TID_WIDTH {3} CONFIG.Component_Name {axis_switch_0}] $sub_core3
+          
+
+ #        set_property -dict [list CONFIG.NUM_SI {3} CONFIG.TDATA_NUM_BYTES {12} CONFIG.HAS_TKEEP {1} CONFIG.HAS_TLAST {1} CONFIG.TID_WIDTH {3} ] $sub_core3
+
+	}
+    update_contents
+}
+
+
