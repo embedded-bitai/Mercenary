@@ -37,6 +37,7 @@ func main() {
 
 	// func ClipByValue(scope *Scope, t tf.Output, clip_value_min tf.Output, clip_value_max tf.Output) (output tf.Output)
 	clipped := op.ClipByValue(root.SubScope("elem"), Y, MIN, MAX)
+	log_value := op.Log(root.SubScope("elem"), clipped)
 
 	fmt.Println("x Shape: ")
 	fmt.Println(x.Shape())
@@ -98,7 +99,6 @@ func main() {
 	//matW1 := op.DeepCopy(root.SubScope("elem"), resW1[0])
 	//matW2 := op.DeepCopy(root.SubScope("elem"), resW2[0])
 
-	//outputs, err := sess.Run(map[tf.Output] * tf.Tensor{W1: resW1, W2: resW2, }, []tf.Output{y}, nil)
 	outputs, err := sess.Run(map[tf.Output] * tf.Tensor{W1: resW1[0], W2: resW2[0], }, []tf.Output{y}, nil)
 	if err != nil {
 		panic(err)
@@ -124,26 +124,31 @@ func main() {
 
     for _, output := range outputs {
         fmt.Println(output.Value().([][]float32))
+		fmt.Print("output shape: ")
+		fmt.Println(output.Shape())
     }
 
+	fmt.Print("log value: ");
+	fmt.Println(log_value);
+
+	//outputs, err = sess.Run(map[tf.Output] * tf.Tensor{CLIPPED: outputs[0], }, []tf.Output{log_value}, nil)
+	outputs, err = sess.Run(map[tf.Output] * tf.Tensor{Y: tmp, MIN: min, MAX: max, }, []tf.Output{log_value}, nil)
+    if err != nil {
+        panic(err)
+    }
+
+    for _, output := range outputs {
+        fmt.Println(output.Value())
+    }
 	/*
-	outputs, err = sess.Run(map[tf.Output] * tf.Tensor{MIN: min, MAX: max, }, []tf.Output{clipped}, nil)
-	if err != nil {
-		panic(err)
-	}
+	outputs, err = sess.Run(map[tf.Output] * tf.Tensor{CLIPPED: tmp, }, []tf.Output{log_value}, nil)
+    if err != nil {
+        panic(err)
+    }
 
-	for _, output := range outputs {
-		fmt.Println(output.Value())
-	}
-
-	res, err := sess.Run(nil, []tf.Output{clipped}, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, output := range res {
-		fmt.Println(output.Value())
-	}
+    for _, output := range outputs {
+        fmt.Println(output.Value().([][]float32))
+    }
 	*/
 
 	//fmt.Println("clipped Shape: ")
