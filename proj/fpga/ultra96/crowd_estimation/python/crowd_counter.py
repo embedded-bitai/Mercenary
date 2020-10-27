@@ -12,7 +12,8 @@ from IPython.display import clear_output
 # In[2]:
 URL = "http://industrial.api.ubidots.com"
 INDUSTRIAL_USER = True
-TOKEN = "YOUR_TOKEN" 
+#TOKEN = "YOUR_TOKEN" 
+TOKEN = "BBFF-gSzUlHTL9uilQ3S3xTnBUkJyFpme3I" 
 DEVICE = "camera"  
 VARIABLE = "people" 
 
