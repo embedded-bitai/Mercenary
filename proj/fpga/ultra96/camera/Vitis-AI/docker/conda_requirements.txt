@@ -1,0 +1,12 @@
+xip
+dpuv1-rt
+vaic
+ddump
+pydot
+pyyaml
+jupyter
+ipywidgets
+dill
+progressbar2
+pytest
+scikit-learn
