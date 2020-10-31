@@ -29,6 +29,10 @@
 
 #include "rplidar.h" //RPLIDAR standard sdk, all-in-one header
 
+#include <unistd.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
 #ifndef _countof
 #define _countof(_Array) (int)(sizeof(_Array) / sizeof(_Array[0]))
 #endif
@@ -47,6 +51,22 @@ static inline void delay(_word_size_t ms){
         usleep(ms*1000);
 }
 #endif
+
+typedef struct _lidar_sample_count {
+	long msg_type;
+	int msg_count;
+} __attribute__((packed)) lidar_sample_count;
+
+typedef struct _lidar_info {
+	float angle;
+	float distance;
+} __attribute__((packed)) lidar_info;
+
+typedef struct _message
+{
+	long msg_type;
+	lidar_info info;
+} __attribute((packed)) message;
 
 using namespace rp::standalone::rplidar;
 
@@ -82,6 +102,15 @@ void ctrlc(int)
 }
 
 int main(int argc, const char * argv[]) {
+	key_t key = 12345;
+	int msqid;
+
+	message msg = { 0 };
+	msg.msg_type = 1;
+
+	lidar_sample_count lsc;
+	lsc.msg_type = 1;
+
     const char * opt_com_path = NULL;
     _u32         baudrateArray[2] = {115200, 256000};
     _u32         opt_com_baudrate = 0;
@@ -89,8 +118,15 @@ int main(int argc, const char * argv[]) {
 
     bool useArgcBaudrate = false;
 
+	printf("This app is the High Resolution Version\n");
     printf("Ultra simple LIDAR data grabber for RPLIDAR.\n"
            "Version: " RPLIDAR_SDK_VERSION "\n");
+
+	if((msqid = msgget(key, IPC_CREAT | 0666)) == -1)
+	{
+		printf("msgget failed\n");
+		exit(0);
+	}
 
     // read serial port from the command line...
     if (argc>1) opt_com_path = argv[1]; // or set to a fixed value: e.g. "com3" 
@@ -207,6 +243,8 @@ int main(int argc, const char * argv[]) {
         op_result = drv->grabScanDataHq(nodes, count);
         if (IS_OK(op_result)) {
             drv->ascendScanData(nodes, count);
+
+#if 0
             for (int pos = 0; pos < (int)count ; ++pos) {
                 printf("%s theta: %03.2f Dist: %08.2f Q: %d \n", 
                     (nodes[pos].flag & RPLIDAR_RESP_MEASUREMENT_SYNCBIT) ?"S ":"  ", 
@@ -214,17 +252,42 @@ int main(int argc, const char * argv[]) {
                     nodes[pos].dist_mm_q2/4.0f,
                     nodes[pos].quality);
             }
+#endif
+
+			lsc.msg_count = count;
+
+			if(msgsnd(msqid, &lsc, sizeof(int), 0) == -1)
+				printf("count send fail\n");
+
+			for (int pos = 0; pos < (int)count; ++pos) {
+				msg.info.angle = (nodes[pos].angle_z_q14 * 90.0f / (1 << 14));
+				msg.info.distance = nodes[pos].dist_mm_q2 / 4.0f;
+
+				if(msgsnd(msqid, &msg, sizeof(struct _lidar_info), 0) == -1)
+				{
+					printf("msgsnd failed\n");
+					msgctl(msqid, IPC_RMID, 0);
+					drv->stop();
+					drv->stopMotor();
+					goto on_finished;
+				}
+			}
         }
 
         if (ctrl_c_pressed){ 
+			msgctl(msqid, IPC_RMID, 0);
             break;
         }
     }
 
+	sleep(1);
+	printf("Stop Motor\n");
+
     drv->stop();
     drv->stopMotor();
-    // done!
+
 on_finished:
+    // done!
     RPlidarDriver::DisposeDriver(drv);
     drv = NULL;
     return 0;
