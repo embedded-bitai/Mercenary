@@ -30,3 +30,5 @@ https://xilinx.github.io/XRT/master/html/platforms.html
 https://github.com/jimheaton/Vitis-AI-DPU_TRD-for-ZCU106  
 15. VCU TRD Design Doc  
 https://japan.xilinx.com/support/documentation/boards_and_kits/zcu106/2019_2/ug1250-zcu106-vcu-trd.pdf  
+16. VCU106 DPU TRD  
+https://github.com/jimheaton/Vitis-AI-DPU_TRD-for-ZCU106  
