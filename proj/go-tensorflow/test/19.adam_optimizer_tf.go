@@ -10,6 +10,7 @@ import (
 
 // Adam Optimizer = ResourceApplyAdam
 // ResourceApplyAdam(scope, var_, m, v, beta1_power, beta2_power, lr, beta1, beta2, epsilon, grad)
+// ResourceApplyAdam(root.SubScope("adam"), 
 func main() {
 	root := op.NewScope()
 	A := op.Placeholder(root.SubScope("imat"), tf.Float, op.PlaceholderShape(tf.MakeShape(2, 2)))
@@ -39,6 +40,40 @@ func main() {
 
 	fmt.Print("nby2 Shape Test: ")
 	fmt.Println(nby2.Shape())
+
+	// AdamOptimizer inherits Optimizer
+	// tf.compat.v1.train.AdamOptimizer(
+	//    learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
+	//    name='Adam'
+	// )
+
+	// train_step = tf.compat.v1.train.AdamOptimizer(0.001).minimize(cross_entropy)
+
+	// Update '*var' according to the Adam algorithm.
+	//
+	// lr_t := \text{learning_rate} * \sqrt{(1 - beta_2^t) / (1 - beta_1^t)}
+	// m_t := beta_1 * m_{t-1} + (1 - beta_1) * g
+	// v_t := beta_2 * v_{t-1} + (1 - beta_2) * g * g
+	// variable := variable - lr_t * m_t / (\sqrt{v_t} + \epsilon)
+	//
+	// Arguments:
+	//  var_: Should be from a Variable().
+	//  m: Should be from a Variable().
+	//  v: Should be from a Variable().
+	//  beta1_power: Must be a scalar.
+	//  beta2_power: Must be a scalar.
+	//  lr: Scaling factor. Must be a scalar.
+	//  beta1: Momentum factor. Must be a scalar.
+	//  beta2: Momentum factor. Must be a scalar.
+	//  epsilon: Ridge term. Must be a scalar.
+	//  grad: The gradient.
+	//
+	// Returns the created operation.
+
+	//adamTest := ResourceApplyAdam(root.SubScope("adam"), var_, m, v, beta1_power, beta2_power, lr, beta1, beta2, epsilon, grad)
+	adamTest := ResourceApplyAdam(root.SubScope("adam"), nil, m, v, beta1_power, beta2_power, lr, beta1, beta2, epsilon, grad)
+	fmt.Print("Go Based Adam Optimizer: ")
+	fmt.Println(adamTest.Shape())
 
 	s1 := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(s1)
