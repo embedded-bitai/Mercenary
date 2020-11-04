@@ -14,3 +14,6 @@ https://www.hackster.io/AlbertaBeef/vitis-ai-1-0-flow-for-avnet-vitis-platforms-
 
 5. Face Detection & Tracking with Vitis 2019.2  
 https://www.hackster.io/AlbertaBeef/face-detection-and-tracking-in-python-on-ultra96-v2-02d104  
+
+6. MIPI CSI with DPU  
+https://developer.xilinx.com/en/articles/ultra96--v1--with-vitis--dpu-integration-and-mipi-platform-tutor.html  
