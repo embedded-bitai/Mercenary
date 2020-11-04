@@ -218,5 +218,5 @@ def compute_gradients(self, loss, var_list=None,
 ```
 
 ```python
-
+ResourcApplyAdam <- resource_apply_adam <- _resource_apply_dense <- update_op <- 
 ```
