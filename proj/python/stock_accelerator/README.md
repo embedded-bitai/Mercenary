@@ -27,4 +27,6 @@ python json_encode.py
 python json_decode.py
 ```
 
-json_socket directory - It's for Socket Programming with json data.  
+csv_socket directory - It's for Socket Programming with csv data.  
+windows_client.py - It sends csv file to pandas DataFrame for Linux from Windows.  
+linux_server.py - It recvs pandas DataFrame for LSTM with Linux FPGA Acceleration.  
