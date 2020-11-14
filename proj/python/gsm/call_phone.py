@@ -17,5 +17,12 @@ win_sock.sendall('1 1 01029807183'.encode())
 data = win_sock.recv(32)
 print('Received', repr(data.decode()))
 
+# Send SMS
+win_sock.sendall('2 1 01029807183 Hello BitAI from Python GSM Module'.encode())
+
+# Receive Message from Server
+data = win_sock.recv(32)
+print('Received', repr(data.decode()))
+
 # Close Socket
 win_sock.myclose()
