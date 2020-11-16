@@ -12,7 +12,7 @@ gsm_sock = GSMSocket()
 gsm_sock.connect(HOST, PORT)
 
 # Phone Call Start
-#gsm_sock.phone_call('01029807183')
+gsm_sock.phone_call('01029807183')
 
 #data = gsm_sock.recv(1024)
 #print('Received', repr(data.decode()))
@@ -23,20 +23,22 @@ gsm_sock.connect(HOST, PORT)
 #data = gsm_sock.recv(1024)
 #print('Received', repr(data.decode()))
 
-gsm_sock.send_msg('01029807183', "Hello BitAI from Python GSM Module")
+#gsm_sock.send_msg('01029807183', "Hello BitAI from Python GSM Module")
 
-data = gsm_sock.recv(1024)
-print('Received', repr(data.decode()))
+#data = gsm_sock.recv(1024)
+#print('Received', repr(data.decode()))
 
-gsm_sock.finish_msg()
+#gsm_sock.finish_msg()
 
-data = gsm_sock.recv(1024)
-print('Received', repr(data.decode()))
+#data = gsm_sock.recv(1024)
+#print('Received', repr(data.decode()))
 
 # Finish Everything
-gsm_sock.kill_daemon()
+#gsm_sock.kill_daemon()
 
-data = gsm_sock.recv(1024)
-print('Received', repr(data.decode()))
+#data = gsm_sock.recv(1024)
+#print('Received', repr(data.decode()))
+
+sleep(3)
 
 gsm_sock.myclose()
