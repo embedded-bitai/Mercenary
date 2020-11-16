@@ -13,7 +13,6 @@ class GSMSocket(Socket):
         msg = "1 0"
         print(msg)
         self.sendall(msg.encode())
-        pass
 
     def send_msg(self, phone_num, sms_msg):
         msg = "2 1 " + phone_num + " " + sms_msg
@@ -21,7 +20,9 @@ class GSMSocket(Socket):
         self.sendall(msg.encode())
 
     def finish_msg(self):
-        pass
+        msg = "2 0"
+        print(msg)
+        self.sendall(msg.encode())
 
     def kill_daemon(self):
         msg = "3"
