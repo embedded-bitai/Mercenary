@@ -84,7 +84,7 @@ void *network_recv(void *fd)
             pthread_mutex_lock(&mtx);
 
             if((read(clnt_sock, (char *)&sock_buf, BUF_SIZE)) != 0)
-                //write(clnt_sock, msg, len);
+                write(clnt_sock, msg, len);
 
             pthread_mutex_unlock(&mtx);
 
